@@ -1,0 +1,10 @@
+[
+  {
+    "id": 1,
+    "title": "Test Meeting",
+    "reminder_time": "2025-09-21T13:45:00",
+    "description": "Event reminder: Test Meeting",
+    "created_at": "2025-09-21T00:15:20.530849",
+    "status": "active"
+  }
+]

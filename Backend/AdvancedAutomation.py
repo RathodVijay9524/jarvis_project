@@ -77,86 +77,249 @@ class JarvisAdvancedAutomation:
     
     def _detect_installed_applications(self) -> Dict[str, str]:
         """
-        Detect installed applications on the system.
-        Returns a dictionary mapping app names to their executable paths.
+        Enhanced application detection for Windows systems.
+        Uses multiple detection methods for better coverage.
         """
         installed_apps = {}
         
         if self.system == "windows":
-            # Common installation directories
-            search_paths = [
-                os.environ.get('PROGRAMFILES', 'C:\\Program Files'),
-                os.environ.get('PROGRAMFILES(X86)', 'C:\\Program Files (x86)'),
-                os.path.join(os.path.expanduser("~"), "AppData", "Local"),
-                os.path.join(os.path.expanduser("~"), "AppData", "Roaming"),
+            print("🔍 Detecting installed applications...")
+            
+            # Method 1: Registry-based detection
+            installed_apps.update(self._detect_from_registry())
+            
+            # Method 2: Common installation directories
+            installed_apps.update(self._detect_from_directories())
+            
+            # Method 3: Windows Start Menu shortcuts
+            installed_apps.update(self._detect_from_start_menu())
+            
+            # Method 4: PATH environment variable
+            installed_apps.update(self._detect_from_path())
+            
+            print(f"✅ Detected {len(installed_apps)} applications")
+            
+        return installed_apps
+    
+    def _detect_from_registry(self) -> Dict[str, str]:
+        """Detect applications from Windows Registry."""
+        apps = {}
+        
+        try:
+            import winreg
+            
+            # Common registry paths for installed applications
+            registry_paths = [
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
             ]
             
-            # Common application patterns
-            app_patterns = {
-                'intellij': ['IntelliJ IDEA', 'JetBrains', 'idea64.exe', 'idea.exe'],
-                'pycharm': ['PyCharm', 'JetBrains', 'pycharm64.exe', 'pycharm.exe'],
-                'vscode': ['Microsoft VS Code', 'Code.exe'],
-                'visual studio': ['Microsoft Visual Studio', 'devenv.exe'],
-                'notepad++': ['Notepad++', 'notepad++.exe'],
-                'sublime': ['Sublime Text', 'sublime_text.exe'],
-                'atom': ['Atom', 'atom.exe'],
-                'discord': ['Discord', 'Discord.exe'],
-                'slack': ['Slack', 'Slack.exe'],
-                'teams': ['Microsoft Teams', 'Teams.exe'],
-                'zoom': ['Zoom', 'Zoom.exe'],
-                'vlc': ['VLC', 'vlc.exe'],
-                'obs': ['obs-studio', 'obs64.exe', 'obs32.exe'],
-                'steam': ['Steam', 'Steam.exe'],
-                'epic games': ['Epic Games', 'EpicGamesLauncher.exe'],
-                'origin': ['Origin', 'Origin.exe'],
-                'adobe photoshop': ['Adobe', 'Photoshop.exe'],
-                'adobe premiere': ['Adobe', 'Adobe Premiere Pro.exe'],
-                'blender': ['Blender Foundation', 'blender.exe'],
-                'gimp': ['GIMP', 'gimp.exe'],
-                'audacity': ['Audacity', 'audacity.exe'],
-                'wireshark': ['Wireshark', 'Wireshark.exe'],
-                'putty': ['PuTTY', 'putty.exe'],
-                'filezilla': ['FileZilla', 'filezilla.exe'],
-                '7zip': ['7-Zip', '7zFM.exe'],
-                'winrar': ['WinRAR', 'WinRAR.exe'],
+            # Key applications to look for
+            target_apps = {
+                'intellij': ['IntelliJ IDEA', 'JetBrains'],
+                'pycharm': ['PyCharm', 'JetBrains'],
+                'vscode': ['Microsoft Visual Studio Code'],
+                'notepad++': ['Notepad++'],
+                'discord': ['Discord'],
+                'spotify': ['Spotify'],
+                'vlc': ['VLC media player'],
+                'chrome': ['Google Chrome'],
+                'firefox': ['Mozilla Firefox'],
+                'obs': ['OBS Studio'],
+                'steam': ['Steam'],
+                'blender': ['Blender'],
+                'gimp': ['GIMP'],
             }
             
-            # Limit to most common applications for faster detection
-            priority_apps = ['intellij', 'pycharm', 'vscode', 'notepad++', 'discord']
-            
-            for app_name, patterns in app_patterns.items():
-                if app_name not in priority_apps:
-                    continue  # Skip non-priority apps for faster startup
-                    
-                for search_path in search_paths[:2]:  # Only search first 2 paths
-                    if not os.path.exists(search_path):
-                        continue
-                    
-                    try:
-                        # Quick directory scan - only go 2 levels deep
-                        for root, dirs, files in os.walk(search_path):
-                            if root.count(os.sep) - search_path.count(os.sep) > 2:
-                                dirs.clear()  # Don't recurse deeper
+            for reg_path in registry_paths:
+                try:
+                    with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path) as key:
+                        for i in range(winreg.QueryInfoKey(key)[0]):
+                            try:
+                                subkey_name = winreg.EnumKey(key, i)
+                                with winreg.OpenKey(key, subkey_name) as subkey:
+                                    try:
+                                        display_name = winreg.QueryValueEx(subkey, "DisplayName")[0]
+                                        install_location = winreg.QueryValueEx(subkey, "InstallLocation")[0]
+                                        
+                                        # Check if this matches any target app
+                                        for app_key, patterns in target_apps.items():
+                                            if any(pattern in display_name for pattern in patterns):
+                                                # Look for executable in install location
+                                                if install_location and os.path.exists(install_location):
+                                                    for root, dirs, files in os.walk(install_location):
+                                                        for file in files:
+                                                            if file.lower().endswith('.exe') and 'launch' not in file.lower():
+                                                                full_path = os.path.join(root, file)
+                                                                apps[app_key] = full_path
+                                                                break
+                                                        if app_key in apps:
+                                                            break
+                                    except (FileNotFoundError, OSError):
+                                        continue
+                            except (OSError, WindowsError):
                                 continue
-                            
-                            # Quick pattern matching
-                            for pattern in patterns:
-                                if pattern in root:
-                                    # Look for executable files
-                                    for file in files:
-                                        if file.lower().endswith('.exe') and pattern.lower() in file.lower():
-                                            full_path = os.path.join(root, file)
-                                            installed_apps[app_name] = full_path
-                                            break
-                                    if app_name in installed_apps:
-                                        break
-                            
-                            if app_name in installed_apps:
-                                break
-                    except (PermissionError, OSError, Exception):
-                        continue
+                except (OSError, WindowsError):
+                    continue
+                    
+        except ImportError:
+            print("⚠️ winreg module not available")
+        except Exception as e:
+            print(f"⚠️ Registry detection error: {e}")
         
-        return installed_apps
+        return apps
+    
+    def _detect_from_directories(self) -> Dict[str, str]:
+        """Detect applications from common installation directories."""
+        apps = {}
+        
+        # Common installation directories
+        search_paths = [
+            os.environ.get('PROGRAMFILES', 'C:\\Program Files'),
+            os.environ.get('PROGRAMFILES(X86)', 'C:\\Program Files (x86)'),
+            os.path.join(os.path.expanduser("~"), "AppData", "Local"),
+            os.path.join(os.path.expanduser("~"), "AppData", "Roaming"),
+        ]
+        
+        # Application patterns
+        app_patterns = {
+            'intellij': ['IntelliJ IDEA', 'JetBrains', 'idea64.exe', 'idea.exe'],
+            'pycharm': ['PyCharm', 'JetBrains', 'pycharm64.exe', 'pycharm.exe'],
+            'vscode': ['Microsoft VS Code', 'Code.exe'],
+            'notepad++': ['Notepad++', 'notepad++.exe'],
+            'discord': ['Discord', 'Discord.exe'],
+            'spotify': ['Spotify', 'Spotify.exe'],
+            'vlc': ['VLC', 'vlc.exe'],
+            'obs': ['obs-studio', 'obs64.exe', 'obs32.exe'],
+            'steam': ['Steam', 'Steam.exe'],
+            'blender': ['Blender Foundation', 'blender.exe'],
+            'gimp': ['GIMP', 'gimp.exe'],
+            'audacity': ['Audacity', 'audacity.exe'],
+        }
+        
+        for app_name, patterns in app_patterns.items():
+            if app_name in apps:  # Skip if already found via registry
+                continue
+                
+            for search_path in search_paths:
+                if not os.path.exists(search_path):
+                    continue
+                
+                try:
+                    for root, dirs, files in os.walk(search_path):
+                        # Limit depth to 3 levels for performance
+                        if root.count(os.sep) - search_path.count(os.sep) > 3:
+                            dirs.clear()
+                            continue
+                        
+                        # Check directory names and files
+                        for pattern in patterns:
+                            if pattern in root or any(pattern in f for f in files):
+                                # Look for executable files
+                                for file in files:
+                                    if (file.lower().endswith('.exe') and 
+                                        pattern.lower() in file.lower() and
+                                        'uninstall' not in file.lower()):
+                                        full_path = os.path.join(root, file)
+                                        apps[app_name] = full_path
+                                        break
+                                if app_name in apps:
+                                    break
+                        
+                        if app_name in apps:
+                            break
+                except (PermissionError, OSError):
+                    continue
+        
+        return apps
+    
+    def _detect_from_start_menu(self) -> Dict[str, str]:
+        """Detect applications from Windows Start Menu shortcuts."""
+        apps = {}
+        
+        start_menu_paths = [
+            os.path.join(os.environ.get('APPDATA', ''), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+            os.path.join(os.environ.get('PROGRAMDATA', ''), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+        ]
+        
+        target_apps = {
+            'intellij': 'IntelliJ IDEA',
+            'pycharm': 'PyCharm',
+            'vscode': 'Visual Studio Code',
+            'discord': 'Discord',
+            'spotify': 'Spotify',
+            'vlc': 'VLC',
+            'obs': 'OBS Studio',
+            'steam': 'Steam',
+        }
+        
+        for start_path in start_menu_paths:
+            if not os.path.exists(start_path):
+                continue
+                
+            try:
+                for root, dirs, files in os.walk(start_path):
+                    for file in files:
+                        if file.endswith('.lnk'):
+                            for app_key, app_name in target_apps.items():
+                                if app_key in apps:  # Skip if already found
+                                    continue
+                                if app_name in file:
+                                    # Try to resolve shortcut
+                                    shortcut_path = os.path.join(root, file)
+                                    try:
+                                        # Use shell to resolve shortcut
+                                        import win32com.client
+                                        shell = win32com.client.Dispatch("WScript.Shell")
+                                        shortcut = shell.CreateShortCut(shortcut_path)
+                                        target_path = shortcut.Targetpath
+                                        if os.path.exists(target_path) and target_path.endswith('.exe'):
+                                            apps[app_key] = target_path
+                                    except ImportError:
+                                        # Fallback: try to extract from lnk file
+                                        pass
+            except (PermissionError, OSError):
+                continue
+        
+        return apps
+    
+    def _detect_from_path(self) -> Dict[str, str]:
+        """Detect applications from PATH environment variable."""
+        apps = {}
+        
+        path_dirs = os.environ.get('PATH', '').split(os.pathsep)
+        
+        # Common executables to look for
+        path_apps = {
+            'notepad': 'notepad.exe',
+            'calculator': 'calc.exe',
+            'paint': 'mspaint.exe',
+            'cmd': 'cmd.exe',
+            'powershell': 'powershell.exe',
+            'chrome': 'chrome.exe',
+            'firefox': 'firefox.exe',
+            'python': 'python.exe',
+            'git': 'git.exe',
+            'node': 'node.exe',
+            'npm': 'npm.exe',
+        }
+        
+        for path_dir in path_dirs:
+            if not os.path.exists(path_dir):
+                continue
+                
+            try:
+                for file in os.listdir(path_dir):
+                    file_lower = file.lower()
+                    for app_key, exe_name in path_apps.items():
+                        if file_lower == exe_name.lower():
+                            full_path = os.path.join(path_dir, file)
+                            apps[app_key] = full_path
+                            break
+            except (PermissionError, OSError):
+                continue
+        
+        return apps
     
     def process_automation_query(self, query: str) -> str:
         """
@@ -184,6 +347,9 @@ class JarvisAdvancedAutomation:
                 return self.create_email(query_lower)
             
             # Application operations
+            elif ("list" in query_lower or "show" in query_lower) and ("app" in query_lower or "application" in query_lower or "installed" in query_lower):
+                return self.list_installed_applications()
+            
             elif "open" in query_lower:
                 return self.open_application(query_lower)
             
@@ -527,83 +693,123 @@ Email draft created by JARVIS on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
     
     def open_application(self, query: str) -> str:
         """
-        Open applications or websites. Can handle:
+        Enhanced application opening with multiple fallback methods.
+        Can handle:
         - Installed applications: "open IntelliJ", "open PyCharm"
         - Web applications: "open YouTube", "open Facebook"
         - System applications: "open notepad", "open calculator"
+        - Generic applications: "open any app name"
         """
         try:
             query_lower = query.lower()
+            print(f"🔍 Opening application: {query}")
             
-            # First, check detected installed applications
+            # Method 1: Check detected installed applications
             for app_name, app_path in self.installed_apps.items():
                 if app_name in query_lower:
-                    if self.system == "windows":
-                        subprocess.Popen([app_path])
-                    return f"✅ Opened {app_name.title()} from detected installation"
+                    print(f"📱 Found installed app: {app_name} -> {app_path}")
+                    try:
+                        if self.system == "windows":
+                            subprocess.Popen([app_path], shell=True)
+                        return f"✅ Opened {app_name.title()} from detected installation"
+                    except Exception as e:
+                        print(f"❌ Failed to open {app_name}: {e}")
+                        continue
             
-            # Then check predefined app mappings
+            # Method 2: Check predefined app mappings
             for app_name, command in self.app_mappings.items():
                 if app_name in query_lower:
+                    print(f"🌐 Found mapped app: {app_name} -> {command}")
                     if command.startswith('http'):
                         # It's a website
                         webbrowser.open(command)
                         return f"✅ Opened {app_name.title()} in your browser"
                     else:
                         # It's an application
-                        if self.system == "windows":
-                            try:
+                        try:
+                            if self.system == "windows":
                                 subprocess.Popen([command], shell=True)
                                 return f"✅ Opened {app_name.title()}"
-                            except FileNotFoundError:
-                                # Try alternative methods
-                                try:
-                                    os.startfile(command)
-                                    return f"✅ Opened {app_name.title()}"
-                                except:
-                                    continue
-            
-            # Try to find application by searching common locations
-            query_words = [word for word in query_lower.split() if len(word) > 2]
-            
-            search_paths = [
-                os.environ.get('PROGRAMFILES', 'C:\\Program Files'),
-                os.environ.get('PROGRAMFILES(X86)', 'C:\\Program Files (x86)'),
-                os.path.join(os.path.expanduser("~"), "AppData", "Local"),
-                self.desktop_path,
-            ]
-            
-            for search_path in search_paths:
-                if not os.path.exists(search_path):
-                    continue
-                
-                try:
-                    for root, dirs, files in os.walk(search_path):
-                        # Don't search too deep
-                        if root.count(os.sep) - search_path.count(os.sep) > 2:
+                        except FileNotFoundError:
                             continue
-                        
-                        for file in files:
-                            if file.lower().endswith('.exe'):
-                                file_lower = file.lower()
-                                # Check if any query word matches the executable name
-                                if any(word in file_lower for word in query_words):
-                                    full_path = os.path.join(root, file)
-                                    if self.system == "windows":
-                                        subprocess.Popen([full_path])
-                                    return f"✅ Opened '{file}' from {root}"
-                except (PermissionError, OSError):
-                    continue
             
-            # If still not found, provide helpful message with detected apps
-            if self.installed_apps:
-                detected_list = ", ".join(list(self.installed_apps.keys())[:10])
-                return f"❌ Could not find application in query: '{query}'.\n🔍 Detected applications: {detected_list}"
-            else:
-                return f"❌ Could not find application in query: '{query}'. Try using full application name or path."
+            # Method 3: Try direct executable name
+            if self.system == "windows":
+                # Extract potential executable name from query
+                words = query_lower.split()
+                for word in words:
+                    if word.endswith('.exe'):
+                        try:
+                            subprocess.Popen([word], shell=True)
+                            return f"✅ Opened {word}"
+                        except:
+                            continue
+                    elif word in ['notepad', 'calc', 'mspaint', 'cmd', 'powershell']:
+                        try:
+                            subprocess.Popen([f"{word}.exe"], shell=True)
+                            return f"✅ Opened {word.title()}"
+                        except:
+                            continue
+            
+            # Method 4: Try Windows Start Menu search
+            if self.system == "windows":
+                try:
+                    # Use Windows search to find and open application
+                    subprocess.Popen(['start', '', query], shell=True)
+                    return f"✅ Attempted to open {query} via Windows search"
+                except:
+                    pass
+            
+            # Method 5: Generic fallback - try to run as command
+            try:
+                if self.system == "windows":
+                    subprocess.Popen([query], shell=True)
+                    return f"✅ Attempted to run: {query}"
+            except:
+                pass
+                
+            # If all methods fail, provide helpful information
+            detected_apps = list(self.installed_apps.keys())
+            available_apps = list(self.app_mappings.keys())
+            
+            return f"""❌ Could not open '{query}'
+
+🔍 Available detected applications: {', '.join(detected_apps[:5]) if detected_apps else 'None detected'}
+
+🌐 Available web apps: {', '.join(available_apps[:5])}
+
+💡 Try these commands:
+• "OPEN CALCULATOR" (system app)
+• "OPEN NOTEPAD" (system app) 
+• "OPEN YOUTUBE" (web app)
+• "OPEN DISCORD" (if installed)
+• "OPEN VSCODE" (if installed)
+
+🔧 Or try: "OPEN [exact app name]"
+"""
             
         except Exception as e:
             return f"❌ Error opening application: {str(e)}"
+    
+    def list_installed_applications(self) -> str:
+        """List all detected installed applications."""
+        try:
+            if not self.installed_apps:
+                return "❌ No applications detected on this system."
+            
+            app_list = []
+            for app_name, app_path in self.installed_apps.items():
+                app_list.append(f"• {app_name.title()}: {app_path}")
+            
+            return f"""📱 DETECTED INSTALLED APPLICATIONS ({len(self.installed_apps)} found):
+
+{chr(10).join(app_list)}
+
+💡 You can open any of these with: "OPEN [app name]"
+Example: "OPEN INTELLIJ", "OPEN DISCORD", "OPEN VSCODE"
+"""
+        except Exception as e:
+            return f"❌ Error listing applications: {str(e)}"
     
     def close_application(self, query: str) -> str:
         """

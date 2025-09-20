@@ -6,10 +6,20 @@ JARVIS AI Assistant - Main entry point that orchestrates all functionalities.
 import sys
 import os
 import argparse
+import time
 from typing import Optional
 
 # Add current directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Import performance optimizations
+try:
+    from Backend.StartupOptimizer import optimize_jarvis_startup
+    from Backend.PerformanceMonitor import show_performance_monitor
+    OPTIMIZATIONS_AVAILABLE = True
+except ImportError:
+    OPTIMIZATIONS_AVAILABLE = False
+    print("⚠️ Performance optimizations not available")
 
 def run_console_mode():
     """Run JARVIS in console mode."""

@@ -101,11 +101,15 @@ Remember:
             'facebook', 'instagram', 'youtube', 'chrome', 'browser'
         ]
         
-        # Realtime keywords  
+        # Realtime keywords (enhanced)
         realtime_keywords = [
             'weather', 'news', 'current', 'latest', 'today', 'now',
             'time', 'date', 'temperature', 'stock', 'price',
-            'who is', 'what is happening', 'recent', 'update'
+            'who is', 'what is happening', 'recent', 'update',
+            'cryptocurrency', 'crypto', 'bitcoin', 'ethereum',
+            'market', 'trading', 'financial', 'investment',
+            'sports', 'scores', 'nfl', 'nba', 'mlb', 'nhl',
+            'translate', 'language', 'translation'
         ]
         
         # Check for automation

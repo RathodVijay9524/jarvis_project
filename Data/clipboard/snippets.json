@@ -1,0 +1,13 @@
+{
+  "email": "Please find the attached document for your review.\n\nBest regards,\n[Your Name]",
+  "meeting": "Meeting Agenda:\n1. \n2. \n3. \n\nAction Items:\n- \n- \n- ",
+  "phone": "Hi, this is [Your Name] calling about [Topic]. Please call me back at [Your Number].",
+  "signature": "Best regards,\n[Your Name]\n[Your Title]\n[Company Name]\n[Phone] [Email]",
+  "todo": "TODO List:\n□ \n□ \n□ \n□ ",
+  "code": "# Code snippet\n",
+  "html": "<html>\n<head>\n    <title></title>\n</head>\n<body>\n    \n</body>\n</html>",
+  "python": "#!/usr/bin/env python3\n\"\"\"\nDocstring\n\"\"\"\n\ndef main():\n    pass\n\nif __name__ == \"__main__\":\n    main()",
+  "json": "{\n    \"key\": \"value\",\n    \"array\": [\n        \"item1\",\n        \"item2\"\n    ]\n}",
+  "markdown": "# Heading\n\n## Subheading\n\n**Bold text**\n\n*Italic text*\n\n- List item 1\n- List item 2",
+  "test": "Test snippet content"
+}

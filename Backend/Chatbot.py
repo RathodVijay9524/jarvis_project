@@ -7,17 +7,39 @@ Based on Kaushik Shresth's architecture.
 import re
 import json
 import os
+import time
+import threading
 from typing import Dict, Any, Optional
 from Backend.Model import ModelWrapper, JarvisMemory
 from Backend.DecisionBrain import JarvisDecisionBrain
 from Backend.AdvancedAutomation import JarvisAdvancedAutomation
 from Backend.RealtimeSearchEngine import JarvisSearch
 from Backend.ImageGeneration import JarvisImageGen
+
+# Import performance optimizations
+try:
+    from Backend.PerformanceOptimizer import get_optimizer, cached
+    from Backend.ErrorHandler import get_error_handler, error_handler
+    OPTIMIZATIONS_AVAILABLE = True
+except ImportError:
+    OPTIMIZATIONS_AVAILABLE = False
+    print("⚠️ Performance optimizations not available")
 from Backend.TextToSpeech import speak
 import threading
 
 class JarvisChatbot:
     def __init__(self):
+        """Initialize JARVIS with all components and performance optimizations."""
+        # Initialize performance systems first
+        if OPTIMIZATIONS_AVAILABLE:
+            self.optimizer = get_optimizer()
+            self.error_handler = get_error_handler()
+            print("✅ Performance optimizations enabled")
+        else:
+            self.optimizer = None
+            self.error_handler = None
+        
+        # Initialize core components
         self.model = ModelWrapper()
         self.memory = JarvisMemory()
         self.decision_brain = JarvisDecisionBrain()
@@ -42,9 +64,14 @@ class JarvisChatbot:
     
     def respond(self, prompt: str, use_voice: bool = False) -> str:
         """
-        Main response method using Decision-Making Brain architecture.
+        Main response method using Decision-Making Brain architecture with performance optimizations.
         """
+        start_time = time.time()
+        
         try:
+            # Track request for performance metrics
+            if self.optimizer:
+                self.optimizer.metrics['total_requests'] += 1
             # Use Decision Brain to categorize the query
             category, processed_query = self.decision_brain.make_decision(prompt)
             
@@ -63,10 +90,20 @@ class JarvisChatbot:
             if use_voice:
                 threading.Thread(target=speak, args=(response,), daemon=True).start()
             
+            # Performance monitoring
+            response_time = time.time() - start_time
+            if self.optimizer and response_time > 5.0:  # Log slow responses
+                print(f"⚠️ Slow response: {response_time:.2f}s for query: {prompt[:50]}...")
+            
             return response
             
         except Exception as e:
-            error_response = f"I apologize, but I encountered an error: {str(e)}"
+            # Enhanced error handling
+            if self.error_handler:
+                error_response = self.error_handler.handle_error(e, "chatbot_response")
+            else:
+                error_response = f"I apologize, but I encountered an error: {str(e)}"
+            
             if use_voice:
                 threading.Thread(target=speak, args=(error_response,), daemon=True).start()
             return error_response
@@ -267,6 +304,51 @@ class JarvisChatbot:
         """Reset conversation memory."""
         self.memory = JarvisMemory()
         return "Memory reset complete. Starting fresh conversation."
+    
+    def get_performance_stats(self) -> str:
+        """Get performance statistics."""
+        if not self.optimizer:
+            return "Performance monitoring not available."
+        
+        stats = self.optimizer.get_performance_stats()
+        
+        response = f"""📊 JARVIS Performance Statistics:
+
+🚀 Cache Performance:
+   • Hit Rate: {stats.get('cache_hit_rate', 0)}%
+   • Cache Size: {stats.get('cache_size', 0)} items
+   • Cache Memory: {stats.get('cache_memory_mb', 0)} MB
+
+⚡ Response Times:
+   • Average API Time: {stats.get('avg_api_time', 0)}s
+   • Total Requests: {stats.get('total_requests', 0)}
+
+💾 Memory Usage:
+   • Current Memory: {stats.get('current_memory_mb', 0)} MB
+   • Background Tasks: {stats.get('background_tasks', 0)}
+
+🔧 System Health:
+   • Startup Time: {stats.get('startup_time', 0)}s
+   • Error Count: {stats.get('error_count', 0)}
+"""
+        return response
+    
+    def optimize_system(self) -> str:
+        """Optimize system performance."""
+        if not self.optimizer:
+            return "Performance optimization not available."
+        
+        try:
+            # Force garbage collection
+            collected = self.optimizer.optimize_memory()
+            
+            # Clean up old cache entries
+            self.optimizer._cleanup_cache()
+            
+            return f"✅ System optimized! {collected} objects collected, cache cleaned."
+            
+        except Exception as e:
+            return f"❌ Optimization failed: {e}"
 
 # Backward compatibility
 class Chatbot(JarvisChatbot):

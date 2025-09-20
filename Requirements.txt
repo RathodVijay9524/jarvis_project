@@ -32,3 +32,8 @@ AppOpener>=1.2
 # Utilities
 rich>=13.0.0
 mtranslate>=1.8
+
+# System Integration Dependencies
+pyperclip>=1.8.2
+pyautogui>=0.9.54
+smtplib2>=0.2.1

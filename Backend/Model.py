@@ -4,10 +4,20 @@ AI Model wrappers and loading utilities for Jarvis.
 """
 
 import os
+import time
 from typing import Optional
 import requests
 import json
 from dotenv import load_dotenv
+
+# Import performance optimizations
+try:
+    from .PerformanceOptimizer import get_optimizer, cached
+    from .ErrorHandler import get_error_handler, error_handler
+    OPTIMIZATIONS_AVAILABLE = True
+except ImportError:
+    OPTIMIZATIONS_AVAILABLE = False
+    print("⚠️ Performance optimizations not available")
 
 load_dotenv()
 
@@ -16,6 +26,14 @@ class ModelWrapper:
         self.model_name = model_name
         self.groq_api_key = api_key or os.getenv("GROQ_API_KEY")
         self.cohere_api_key = os.getenv("COHERE_API_KEY")
+        
+        # Initialize performance optimizations
+        if OPTIMIZATIONS_AVAILABLE:
+            self.optimizer = get_optimizer()
+            self.error_handler = get_error_handler()
+        else:
+            self.optimizer = None
+            self.error_handler = None
         
         # Jarvis personality and context
         self.system_prompt = """
@@ -39,17 +57,42 @@ class ModelWrapper:
 
     def infer(self, prompt: str, use_system_prompt: bool = True) -> str:
         """
-        Generate AI response using the configured model.
+        Generate AI response using the configured model with performance optimizations.
         """
         try:
+            # Create cache key for this inference
+            cache_key = f"inference:{self.model_name}:{hash(prompt + str(use_system_prompt))}"
+            
+            # Try to get cached result
+            if self.optimizer:
+                cached_result = self.optimizer.get_cached_result(cache_key)
+                if cached_result is not None:
+                    print(f"🚀 Cache hit for inference")
+                    return cached_result
+            
+            # Generate fresh response
+            start_time = time.time()
+            
             if self.model_name == "groq" and self.groq_api_key:
-                return self._groq_inference(prompt, use_system_prompt)
+                result = self._groq_inference(prompt, use_system_prompt)
             elif self.model_name == "cohere" and self.cohere_api_key:
-                return self._cohere_inference(prompt, use_system_prompt)
+                result = self._cohere_inference(prompt, use_system_prompt)
             else:
-                return self._fallback_response(prompt)
+                result = self._fallback_response(prompt)
+            
+            # Cache the result
+            if self.optimizer:
+                self.optimizer.cache_result(cache_key, result, ttl=1800)  # Cache for 30 minutes
+                print(f"🌐 Inference completed in {time.time() - start_time:.2f}s")
+            
+            return result
+            
         except Exception as e:
-            return f"I apologize, but I'm experiencing some technical difficulties: {str(e)}"
+            if self.error_handler:
+                error_msg = self.error_handler.handle_error(e, "model_inference")
+                return error_msg
+            else:
+                return f"I apologize, but I'm experiencing some technical difficulties: {str(e)}"
 
     def _groq_inference(self, prompt: str, use_system_prompt: bool) -> str:
         """

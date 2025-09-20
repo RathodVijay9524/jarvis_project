@@ -41,9 +41,11 @@ class VoiceThread(QThread):
             self.start()
     
     def stop_listening(self):
+        """Stop listening with better cleanup."""
         self.listening = False
         if self.stt:
             self.stt.stop_listening()
+        print("🔇 Voice thread stop_listening called")
     
     def run(self):
         def voice_callback(command):
@@ -233,12 +235,18 @@ class JarvisGUI(QMainWindow):
         self.voice_btn.clicked.connect(self.toggle_voice)
         self.voice_btn.setCheckable(True)
         
+        # Force stop voice button
+        self.force_stop_btn = QPushButton("⛔ Force Stop Voice")
+        self.force_stop_btn.clicked.connect(self.force_stop_voice)
+        self.force_stop_btn.setStyleSheet("QPushButton { background-color: #f44336; color: white; }")
+        
         # Clear button
         clear_btn = QPushButton("🗑️ Clear")
         clear_btn.clicked.connect(self.clear_chat)
         
         header_layout.addWidget(title_label)
         header_layout.addStretch()
+        header_layout.addWidget(self.force_stop_btn)
         header_layout.addWidget(self.voice_btn)
         header_layout.addWidget(clear_btn)
         
@@ -362,21 +370,69 @@ class JarvisGUI(QMainWindow):
             self.add_jarvis_message(f"Voice chat error: {str(e)}")
     
     def stop_voice_chat(self):
-        """Stop voice chat."""
-        if self.voice_thread:
-            self.voice_thread.stop_listening()
-            self.voice_thread.wait()
+        """Stop voice chat with improved cleanup."""
+        try:
+            if self.voice_thread:
+                print("🔇 Stopping voice thread...")
+                self.voice_thread.stop_listening()
+                
+                # Wait for thread to finish with timeout
+                if not self.voice_thread.wait(3000):  # 3 second timeout
+                    print("⚠️ Voice thread didn't stop gracefully, terminating...")
+                    self.voice_thread.terminate()
+                    self.voice_thread.wait(1000)  # Wait 1 more second
+                
+                self.voice_thread = None
+                print("✅ Voice thread stopped successfully")
+        
+        except Exception as e:
+            print(f"Error stopping voice thread: {e}")
         
         self.is_voice_active = False
         self.voice_btn.setText("🎤 Voice Chat")
         self.voice_btn.setChecked(False)
         self.statusBar().showMessage("Voice chat stopped")
         
-        self.add_jarvis_message("Voice chat deactivated.")
+        self.add_jarvis_message("🔇 Voice chat deactivated - you can now control voice properly.")
+    
+    def force_stop_voice(self):
+        """Force stop voice system - emergency stop."""
+        print("⛔ FORCE STOPPING VOICE SYSTEM")
+        
+        try:
+            # Force terminate voice thread
+            if self.voice_thread:
+                self.voice_thread.listening = False
+                if self.voice_thread.stt:
+                    self.voice_thread.stt.is_listening = False
+                
+                # Terminate thread forcefully
+                self.voice_thread.terminate()
+                self.voice_thread.wait(1000)
+                self.voice_thread = None
+                print("✅ Voice thread force terminated")
+            
+            # Reset all voice states
+            self.is_voice_active = False
+            self.voice_btn.setText("🎤 Voice Chat")
+            self.voice_btn.setChecked(False)
+            self.statusBar().showMessage("Voice system force stopped")
+            
+            self.add_jarvis_message("⛔ Voice system FORCE STOPPED! You can now use JARVIS normally.")
+            
+        except Exception as e:
+            print(f"Force stop error: {e}")
+            self.add_jarvis_message(f"⛔ Force stop attempted. Error: {e}")
     
     def handle_voice_command(self, command: str):
-        """Handle voice command from speech recognition."""
-        self.add_user_message(f"🎤 {command}")
+        """Handle voice command from speech recognition with better processing."""
+        print(f"🎤 Voice command received: '{command}'")
+        
+        # Add command to GUI chat
+        self.add_user_message(f"🎤 Voice: {command}")
+        
+        # Update status
+        self.statusBar().showMessage(f"Processing voice command: {command}")
         
         # Process with JARVIS
         threading.Thread(target=self.process_voice_command, args=(command,), daemon=True).start()
@@ -416,6 +472,19 @@ class JarvisGUI(QMainWindow):
                 self.system_info.setPlainText("System information not available.")
         except Exception as e:
             self.system_info.setPlainText(f"Error getting system info: {str(e)}")
+    
+    def closeEvent(self, event):
+        """Handle GUI close event with voice cleanup."""
+        print("🔄 Closing JARVIS GUI...")
+        
+        # Force stop voice if active
+        if self.is_voice_active:
+            print("🔇 Force stopping voice on GUI close...")
+            self.force_stop_voice()
+        
+        # Accept the close event
+        event.accept()
+        print("✅ JARVIS GUI closed successfully")
 
 def start_gui():
     """Start the JARVIS GUI application."""
