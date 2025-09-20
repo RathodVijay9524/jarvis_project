@@ -99,8 +99,12 @@ class JarvisTextToSpeech:
             while pygame.mixer.music.get_busy():
                 pygame.time.wait(100)
             
-            # Cleanup
-            os.unlink(audio_file)
+            # Cleanup with retry
+            try:
+                time.sleep(0.1)  # Brief delay
+                os.unlink(audio_file)
+            except:
+                pass  # Ignore cleanup errors
             
             return True
             

@@ -1,6 +1,10 @@
 # 🤖 JARVIS AI Assistant
 
-**Just A Rather Very Intelligent System** - A comprehensive AI assistant inspired by Tony Stark's JARVIS, featuring voice interaction, web search, system automation, image generation, and much more.
+**Just A Rather Very Intelligent System** - A comprehensive AI assistant inspired by Tony Stark's JARVIS, featuring advanced Decision-Making Brain, voice interaction, web search, system automation, image generation, and much more.
+
+![JARVIS Logo](https://img.shields.io/badge/JARVIS-AI%20Assistant-blue?style=for-the-badge&logo=robot)
+![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge&logo=python)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
 ## ✨ Features
 
