@@ -34,6 +34,9 @@ class JarvisAdvancedAutomation:
         os.makedirs(self.desktop_path, exist_ok=True)
         os.makedirs(self.documents_path, exist_ok=True)
         
+        # Detect installed applications
+        self.installed_apps = self._detect_installed_applications()
+        
         # Enhanced application mappings
         self.app_mappings = {
             # Browsers
@@ -64,6 +67,96 @@ class JarvisAdvancedAutomation:
             "control": "control",
             "taskmgr": "taskmgr",
         }
+        
+        # Detect installed applications on initialization (with timeout protection)
+        try:
+            self.installed_apps = self._detect_installed_applications()
+        except Exception as e:
+            print(f"⚠️ App detection failed: {e}")
+            self.installed_apps = {}
+    
+    def _detect_installed_applications(self) -> Dict[str, str]:
+        """
+        Detect installed applications on the system.
+        Returns a dictionary mapping app names to their executable paths.
+        """
+        installed_apps = {}
+        
+        if self.system == "windows":
+            # Common installation directories
+            search_paths = [
+                os.environ.get('PROGRAMFILES', 'C:\\Program Files'),
+                os.environ.get('PROGRAMFILES(X86)', 'C:\\Program Files (x86)'),
+                os.path.join(os.path.expanduser("~"), "AppData", "Local"),
+                os.path.join(os.path.expanduser("~"), "AppData", "Roaming"),
+            ]
+            
+            # Common application patterns
+            app_patterns = {
+                'intellij': ['IntelliJ IDEA', 'JetBrains', 'idea64.exe', 'idea.exe'],
+                'pycharm': ['PyCharm', 'JetBrains', 'pycharm64.exe', 'pycharm.exe'],
+                'vscode': ['Microsoft VS Code', 'Code.exe'],
+                'visual studio': ['Microsoft Visual Studio', 'devenv.exe'],
+                'notepad++': ['Notepad++', 'notepad++.exe'],
+                'sublime': ['Sublime Text', 'sublime_text.exe'],
+                'atom': ['Atom', 'atom.exe'],
+                'discord': ['Discord', 'Discord.exe'],
+                'slack': ['Slack', 'Slack.exe'],
+                'teams': ['Microsoft Teams', 'Teams.exe'],
+                'zoom': ['Zoom', 'Zoom.exe'],
+                'vlc': ['VLC', 'vlc.exe'],
+                'obs': ['obs-studio', 'obs64.exe', 'obs32.exe'],
+                'steam': ['Steam', 'Steam.exe'],
+                'epic games': ['Epic Games', 'EpicGamesLauncher.exe'],
+                'origin': ['Origin', 'Origin.exe'],
+                'adobe photoshop': ['Adobe', 'Photoshop.exe'],
+                'adobe premiere': ['Adobe', 'Adobe Premiere Pro.exe'],
+                'blender': ['Blender Foundation', 'blender.exe'],
+                'gimp': ['GIMP', 'gimp.exe'],
+                'audacity': ['Audacity', 'audacity.exe'],
+                'wireshark': ['Wireshark', 'Wireshark.exe'],
+                'putty': ['PuTTY', 'putty.exe'],
+                'filezilla': ['FileZilla', 'filezilla.exe'],
+                '7zip': ['7-Zip', '7zFM.exe'],
+                'winrar': ['WinRAR', 'WinRAR.exe'],
+            }
+            
+            # Limit to most common applications for faster detection
+            priority_apps = ['intellij', 'pycharm', 'vscode', 'notepad++', 'discord']
+            
+            for app_name, patterns in app_patterns.items():
+                if app_name not in priority_apps:
+                    continue  # Skip non-priority apps for faster startup
+                    
+                for search_path in search_paths[:2]:  # Only search first 2 paths
+                    if not os.path.exists(search_path):
+                        continue
+                    
+                    try:
+                        # Quick directory scan - only go 2 levels deep
+                        for root, dirs, files in os.walk(search_path):
+                            if root.count(os.sep) - search_path.count(os.sep) > 2:
+                                dirs.clear()  # Don't recurse deeper
+                                continue
+                            
+                            # Quick pattern matching
+                            for pattern in patterns:
+                                if pattern in root:
+                                    # Look for executable files
+                                    for file in files:
+                                        if file.lower().endswith('.exe') and pattern.lower() in file.lower():
+                                            full_path = os.path.join(root, file)
+                                            installed_apps[app_name] = full_path
+                                            break
+                                    if app_name in installed_apps:
+                                        break
+                            
+                            if app_name in installed_apps:
+                                break
+                    except (PermissionError, OSError, Exception):
+                        continue
+        
+        return installed_apps
     
     def process_automation_query(self, query: str) -> str:
         """
@@ -198,30 +291,84 @@ JARVIS AI Assistant
     
     def open_file(self, query: str) -> str:
         """
-        Open a specific file or file type.
+        Open a specific file or file type. Can handle:
+        - Specific file paths: "open C:/Users/file.txt"
+        - File names: "open myfile.docx" 
+        - File types: "open text file", "open pdf"
         """
         try:
-            # Look for common files on desktop
-            common_files = []
+            # Check if query contains a specific file path
+            if any(char in query for char in ['/', '\\', ':']):
+                # Extract potential file path from query
+                words = query.split()
+                for i, word in enumerate(words):
+                    if any(char in word for char in ['/', '\\', ':']):
+                        # Found a path-like string
+                        potential_path = ' '.join(words[i:])  # Take rest of query as path
+                        if os.path.exists(potential_path):
+                            if self.system == "windows":
+                                os.startfile(potential_path)
+                            return f"✅ Opened '{os.path.basename(potential_path)}'"
             
-            if os.path.exists(self.desktop_path):
-                for file in os.listdir(self.desktop_path):
-                    if file.endswith(('.txt', '.docx', '.pdf', '.xlsx')):
-                        common_files.append(file)
+            # Search for files by name in common locations
+            search_locations = [
+                self.desktop_path,
+                self.documents_path,
+                os.path.join(os.path.expanduser("~"), "Downloads"),
+                os.path.expanduser("~")
+            ]
             
-            if common_files:
-                # Open the most recent file
-                latest_file = max(
-                    [os.path.join(self.desktop_path, f) for f in common_files],
-                    key=os.path.getmtime
-                )
+            # Extract potential filename from query
+            query_lower = query.lower()
+            
+            found_files = []
+            for location in search_locations:
+                if os.path.exists(location):
+                    for root, dirs, files in os.walk(location):
+                        # Don't search too deep (max 2 levels)
+                        if root.count(os.sep) - location.count(os.sep) > 2:
+                            continue
+                            
+                        for file in files:
+                            file_lower = file.lower()
+                            # Check if any word in query matches filename
+                            query_words = [word for word in query_lower.split() if len(word) > 2]
+                            if any(word in file_lower for word in query_words):
+                                full_path = os.path.join(root, file)
+                                found_files.append((full_path, os.path.getmtime(full_path)))
+            
+            if found_files:
+                # Sort by modification time and take the most recent
+                found_files.sort(key=lambda x: x[1], reverse=True)
+                file_path = found_files[0][0]
                 
                 if self.system == "windows":
-                    os.startfile(latest_file)
+                    os.startfile(file_path)
                 
-                return f"✅ Opened '{os.path.basename(latest_file)}'"
-            else:
-                return "❌ No suitable files found on desktop. Try creating a file first."
+                return f"✅ Opened '{os.path.basename(file_path)}' from {os.path.dirname(file_path)}"
+            
+            # If no specific file found, look for files by type
+            file_extensions = {
+                'text': ['.txt', '.md', '.log'],
+                'document': ['.docx', '.doc', '.pdf'],
+                'spreadsheet': ['.xlsx', '.xls', '.csv'],
+                'image': ['.jpg', '.jpeg', '.png', '.gif', '.bmp'],
+                'video': ['.mp4', '.avi', '.mkv', '.mov'],
+                'audio': ['.mp3', '.wav', '.flac', '.m4a']
+            }
+            
+            for file_type, extensions in file_extensions.items():
+                if file_type in query_lower:
+                    for location in search_locations:
+                        if os.path.exists(location):
+                            for file in os.listdir(location):
+                                if any(file.lower().endswith(ext) for ext in extensions):
+                                    file_path = os.path.join(location, file)
+                                    if self.system == "windows":
+                                        os.startfile(file_path)
+                                    return f"✅ Opened {file_type} file: '{file}'"
+            
+            return f"❌ Could not find file matching: '{query}'. Try specifying full path or filename."
                 
         except Exception as e:
             return f"❌ Error opening file: {str(e)}"
@@ -254,22 +401,88 @@ JARVIS AI Assistant
     
     def open_folder(self, query: str) -> str:
         """
-        Open a specific folder.
+        Open a specific folder. Can handle:
+        - Specific folder paths: "open C:/Users/MyFolder"
+        - Common folder names: "desktop", "documents", "downloads"
+        - Project folders: "open project folder"
         """
         try:
-            if "desktop" in query:
-                folder_path = self.desktop_path
-            elif "document" in query:
-                folder_path = self.documents_path
-            elif "download" in query:
-                folder_path = os.path.join(os.path.expanduser("~"), "Downloads")
-            else:
-                folder_path = self.desktop_path  # Default
+            query_lower = query.lower()
             
+            # Check if query contains a specific folder path
+            if any(char in query for char in ['/', '\\', ':']):
+                # Extract potential folder path from query
+                words = query.split()
+                for i, word in enumerate(words):
+                    if any(char in word for char in ['/', '\\', ':']):
+                        # Found a path-like string
+                        potential_path = ' '.join(words[i:])  # Take rest of query as path
+                        if os.path.exists(potential_path) and os.path.isdir(potential_path):
+                            if self.system == "windows":
+                                subprocess.Popen(['explorer', potential_path])
+                            return f"✅ Opened '{os.path.basename(potential_path)}' folder"
+            
+            # Handle common folder names
+            folder_mappings = {
+                'desktop': self.desktop_path,
+                'document': self.documents_path,
+                'download': os.path.join(os.path.expanduser("~"), "Downloads"),
+                'music': os.path.join(os.path.expanduser("~"), "Music"),
+                'picture': os.path.join(os.path.expanduser("~"), "Pictures"),
+                'video': os.path.join(os.path.expanduser("~"), "Videos"),
+                'home': os.path.expanduser("~"),
+                'user': os.path.expanduser("~"),
+                'temp': os.environ.get('TEMP', '/tmp'),
+                'program': os.environ.get('PROGRAMFILES', 'C:\\Program Files'),
+                'appdata': os.environ.get('APPDATA', ''),
+            }
+            
+            # Check for direct folder matches
+            for folder_name, folder_path in folder_mappings.items():
+                if folder_name in query_lower and folder_path and os.path.exists(folder_path):
+                    if self.system == "windows":
+                        subprocess.Popen(['explorer', folder_path])
+                    return f"✅ Opened {folder_name.title()} folder"
+            
+            # Search for folders by name in common locations
+            search_locations = [
+                os.path.expanduser("~"),
+                self.desktop_path,
+                self.documents_path,
+                os.path.join(os.path.expanduser("~"), "Downloads"),
+            ]
+            
+            found_folders = []
+            query_words = [word for word in query_lower.split() if len(word) > 2]
+            
+            for location in search_locations:
+                if os.path.exists(location):
+                    try:
+                        for item in os.listdir(location):
+                            item_path = os.path.join(location, item)
+                            if os.path.isdir(item_path):
+                                item_lower = item.lower()
+                                # Check if any word in query matches folder name
+                                if any(word in item_lower for word in query_words):
+                                    found_folders.append((item_path, os.path.getmtime(item_path)))
+                    except PermissionError:
+                        continue
+            
+            if found_folders:
+                # Sort by modification time and take the most recent
+                found_folders.sort(key=lambda x: x[1], reverse=True)
+                folder_path = found_folders[0][0]
+                
+                if self.system == "windows":
+                    subprocess.Popen(['explorer', folder_path])
+                
+                return f"✅ Opened '{os.path.basename(folder_path)}' folder from {os.path.dirname(folder_path)}"
+            
+            # Default to desktop if nothing found
             if self.system == "windows":
-                subprocess.Popen(['explorer', folder_path])
+                subprocess.Popen(['explorer', self.desktop_path])
             
-            return f"✅ Opened {os.path.basename(folder_path)} folder"
+            return f"ℹ️ Could not find specific folder '{query}', opened Desktop instead"
             
         except Exception as e:
             return f"❌ Error opening folder: {str(e)}"
@@ -314,12 +527,24 @@ Email draft created by JARVIS on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
     
     def open_application(self, query: str) -> str:
         """
-        Open applications or websites.
+        Open applications or websites. Can handle:
+        - Installed applications: "open IntelliJ", "open PyCharm"
+        - Web applications: "open YouTube", "open Facebook"
+        - System applications: "open notepad", "open calculator"
         """
         try:
-            # Extract app name from query
+            query_lower = query.lower()
+            
+            # First, check detected installed applications
+            for app_name, app_path in self.installed_apps.items():
+                if app_name in query_lower:
+                    if self.system == "windows":
+                        subprocess.Popen([app_path])
+                    return f"✅ Opened {app_name.title()} from detected installation"
+            
+            # Then check predefined app mappings
             for app_name, command in self.app_mappings.items():
-                if app_name in query:
+                if app_name in query_lower:
                     if command.startswith('http'):
                         # It's a website
                         webbrowser.open(command)
@@ -327,10 +552,55 @@ Email draft created by JARVIS on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
                     else:
                         # It's an application
                         if self.system == "windows":
-                            subprocess.Popen([command], shell=True)
-                        return f"✅ Opened {app_name.title()}"
+                            try:
+                                subprocess.Popen([command], shell=True)
+                                return f"✅ Opened {app_name.title()}"
+                            except FileNotFoundError:
+                                # Try alternative methods
+                                try:
+                                    os.startfile(command)
+                                    return f"✅ Opened {app_name.title()}"
+                                except:
+                                    continue
             
-            return f"❌ Could not find application in query: '{query}'"
+            # Try to find application by searching common locations
+            query_words = [word for word in query_lower.split() if len(word) > 2]
+            
+            search_paths = [
+                os.environ.get('PROGRAMFILES', 'C:\\Program Files'),
+                os.environ.get('PROGRAMFILES(X86)', 'C:\\Program Files (x86)'),
+                os.path.join(os.path.expanduser("~"), "AppData", "Local"),
+                self.desktop_path,
+            ]
+            
+            for search_path in search_paths:
+                if not os.path.exists(search_path):
+                    continue
+                
+                try:
+                    for root, dirs, files in os.walk(search_path):
+                        # Don't search too deep
+                        if root.count(os.sep) - search_path.count(os.sep) > 2:
+                            continue
+                        
+                        for file in files:
+                            if file.lower().endswith('.exe'):
+                                file_lower = file.lower()
+                                # Check if any query word matches the executable name
+                                if any(word in file_lower for word in query_words):
+                                    full_path = os.path.join(root, file)
+                                    if self.system == "windows":
+                                        subprocess.Popen([full_path])
+                                    return f"✅ Opened '{file}' from {root}"
+                except (PermissionError, OSError):
+                    continue
+            
+            # If still not found, provide helpful message with detected apps
+            if self.installed_apps:
+                detected_list = ", ".join(list(self.installed_apps.keys())[:10])
+                return f"❌ Could not find application in query: '{query}'.\n🔍 Detected applications: {detected_list}"
+            else:
+                return f"❌ Could not find application in query: '{query}'. Try using full application name or path."
             
         except Exception as e:
             return f"❌ Error opening application: {str(e)}"
