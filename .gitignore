@@ -1,0 +1,87 @@
+# JARVIS AI Assistant - Git Ignore File
+
+# Environment variables (contains API keys)
+.env
+*.env
+env_template.txt
+
+# API Keys and sensitive data
+*api_key*
+*API_KEY*
+jarvis_config.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Generated files
+Frontend/Files/*.txt
+Frontend/Files/*.png
+Frontend/Files/*.jpg
+Frontend/Files/*.mp3
+Frontend/Files/*.wav
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Audio files (TTS generated)
+*.mp3
+*.wav
+
+# Test files
+test_*.py
+*_test.py
+demo_*.py
+*_demo.py
+
+# Jupyter Notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache
+.cache/
+.pytest_cache/
