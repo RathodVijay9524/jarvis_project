@@ -47,6 +47,15 @@ class JarvisChatbot:
         self.search_engine = JarvisSearch()
         self.image_gen = JarvisImageGen()
         
+        # Initialize AI Personality system
+        try:
+            from .AIPersonality import JarvisAIPersonality
+            self.ai_personality = JarvisAIPersonality()
+            print("✅ AI Personality system initialized")
+        except ImportError:
+            self.ai_personality = None
+            print("⚠️ AI Personality system not available")
+        
         # Command patterns
         self.command_patterns = {
             'search': r'(?:search|find|look up|google)\s+(.+)',
@@ -72,6 +81,13 @@ class JarvisChatbot:
             # Track request for performance metrics
             if self.optimizer:
                 self.optimizer.metrics['total_requests'] += 1
+            
+            # Analyze user input with AI Personality system
+            user_name = self.memory.get_name()
+            analysis = None
+            if self.ai_personality:
+                analysis = self.ai_personality.analyze_user_input(prompt, user_name)
+            
             # Use Decision Brain to categorize the query
             category, processed_query = self.decision_brain.make_decision(prompt)
             
@@ -80,6 +96,8 @@ class JarvisChatbot:
                 response = self.automation.process_automation_query(processed_query)
             elif category == 'realtime':
                 response = self._handle_realtime_query(processed_query)
+            elif category == 'personality':
+                response = self._handle_personality_query(processed_query)
             else:  # general
                 response = self._handle_general_query(processed_query)
             
@@ -89,6 +107,10 @@ class JarvisChatbot:
             # Speak response if requested
             if use_voice:
                 threading.Thread(target=speak, args=(response,), daemon=True).start()
+            
+            # Enhance response with AI Personality
+            if self.ai_personality and analysis:
+                response = self.ai_personality.generate_contextual_response(response, analysis)
             
             # Performance monitoring
             response_time = time.time() - start_time
@@ -175,6 +197,40 @@ class JarvisChatbot:
                 
         except Exception as e:
             return f"Realtime query error: {str(e)}"
+    
+    def _handle_personality_query(self, query: str) -> str:
+        """
+        Handle AI personality and conversation context queries.
+        """
+        try:
+            query_lower = query.lower()
+            
+            # Personality profile queries
+            if any(word in query_lower for word in ['personality', 'profile', 'traits', 'tell me about yourself']):
+                return self.get_ai_personality_profile()
+            
+            # Conversation context queries
+            elif any(word in query_lower for word in ['conversation', 'context', 'what are you thinking']):
+                return self.get_conversation_context()
+            
+            # Learning insights queries
+            elif any(word in query_lower for word in ['learning', 'insights', 'what have you learned']):
+                return self.get_learning_insights()
+            
+            # Mood and emotion queries
+            elif any(word in query_lower for word in ['mood', 'emotion', 'feeling', 'how are you']):
+                if self.ai_personality:
+                    mood = self.ai_personality.conversation_mood
+                    return f"I'm feeling {mood} today. How are you doing? I'm here to help with whatever you need!"
+                else:
+                    return "I'm doing well, thank you for asking! How can I assist you today?"
+            
+            # Default personality response
+            else:
+                return "I'm JARVIS, your AI assistant. I'm here to help with tasks, answer questions, and make your day more productive. What would you like to know about me or how can I assist you?"
+                
+        except Exception as e:
+            return f"Personality query error: {str(e)}"
     
     def _process_commands(self, prompt: str) -> Optional[str]:
         """
@@ -349,6 +405,30 @@ class JarvisChatbot:
             
         except Exception as e:
             return f"❌ Optimization failed: {e}"
+    
+    def get_ai_personality_profile(self) -> str:
+        """Get AI personality profile."""
+        if not self.ai_personality:
+            return "❌ AI Personality system not available."
+        return self.ai_personality.get_personality_profile()
+    
+    def get_conversation_context(self) -> str:
+        """Get conversation context summary."""
+        if not self.ai_personality:
+            return "❌ AI Personality system not available."
+        return self.ai_personality.get_conversation_summary()
+    
+    def get_learning_insights(self) -> str:
+        """Get AI learning insights."""
+        if not self.ai_personality:
+            return "❌ AI Personality system not available."
+        return self.ai_personality.get_learning_insights()
+    
+    def update_personality_trait(self, trait: str, value: float) -> str:
+        """Update AI personality trait."""
+        if not self.ai_personality:
+            return "❌ AI Personality system not available."
+        return self.ai_personality.update_personality_trait(trait, value)
 
 # Backward compatibility
 class Chatbot(JarvisChatbot):

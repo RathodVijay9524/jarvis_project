@@ -112,10 +112,22 @@ Remember:
             'translate', 'language', 'translation'
         ]
         
+        # AI Personality keywords
+        personality_keywords = [
+            'personality', 'profile', 'traits', 'conversation', 'context',
+            'learning', 'insights', 'mood', 'emotion', 'feeling',
+            'how are you', 'what are you thinking', 'tell me about yourself'
+        ]
+        
         # Check for automation
         for keyword in automation_keywords:
             if keyword in query_lower:
                 return 'automation'
+        
+        # Check for AI personality
+        for keyword in personality_keywords:
+            if keyword in query_lower:
+                return 'personality'
         
         # Check for realtime
         for keyword in realtime_keywords:

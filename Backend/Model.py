@@ -167,6 +167,7 @@ class JarvisMemory:
         self.conversation_history = []
         self.user_preferences = {}
         self.max_history = max_history
+        self.personal_info = {}
     
     def add_interaction(self, user_input: str, jarvis_response: str):
         """Add interaction to memory."""
@@ -196,3 +197,45 @@ class JarvisMemory:
         """Get current timestamp."""
         from datetime import datetime
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    def store_name(self, name: str):
+        """Store user's name."""
+        self.personal_info['name'] = name
+    
+    def get_name(self) -> str:
+        """Get user's name."""
+        return self.personal_info.get('name', 'User')
+    
+    def store_personal_info(self, key: str, value: str):
+        """Store personal information."""
+        self.personal_info[key] = value
+    
+    def get_personal_info(self, key: str) -> str:
+        """Get personal information."""
+        return self.personal_info.get(key, '')
+    
+    def detect_name_from_input(self, user_input: str) -> bool:
+        """Detect if user is introducing their name."""
+        import re
+        patterns = [
+            r"my name is (\w+)",
+            r"i am (\w+)",
+            r"i'm (\w+)",
+            r"call me (\w+)",
+            r"i go by (\w+)"
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, user_input.lower())
+            if match:
+                name = match.group(1).capitalize()
+                self.store_name(name)
+                return True
+        return False
+    
+    def get_personalized_context(self) -> str:
+        """Get personalized context with user's name."""
+        name = self.get_name()
+        if name != 'User':
+            return f"User's name: {name}\n"
+        return ""
