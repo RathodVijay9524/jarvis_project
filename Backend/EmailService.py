@@ -4,6 +4,7 @@ Email sending service for JARVIS with multiple providers.
 """
 
 import smtplib
+import imaplib
 import os
 import json
 import time
@@ -11,9 +12,18 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from email.header import decode_header
+from email.message import EmailMessage
+import email
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 import ssl
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+# Also try to load from jarvis_config.env
+load_dotenv("jarvis_config.env")
 
 class JarvisEmailService:
     """
@@ -506,6 +516,200 @@ For Outlook: Use your regular password or app password.
         except Exception as e:
             return f"❌ Connection test failed: {str(e)}"
     
+    def read_emails(self, limit: int = 5, folder: str = "INBOX", unread_only: bool = False) -> str:
+        """
+        Read emails from inbox.
+        
+        Args:
+            limit: Number of emails to fetch
+            folder: Email folder (INBOX, Sent, Drafts, etc.)
+            unread_only: Only fetch unread emails
+        """
+        try:
+            if not all([self.email_address, self.email_password]):
+                return "❌ Email not configured. Please set up email credentials first."
+            
+            # Get IMAP server configuration
+            imap_server = self._get_imap_server()
+            if not imap_server:
+                return "❌ IMAP server not configured for your email provider."
+            
+            # Connect to IMAP server
+            mail = imaplib.IMAP4_SSL(imap_server)
+            mail.login(self.email_address, self.email_password)
+            
+            # Select folder
+            mail.select(folder)
+            
+            # Search for emails
+            if unread_only:
+                status, messages = mail.search(None, 'UNSEEN')
+            else:
+                status, messages = mail.search(None, 'ALL')
+            
+            if status != 'OK':
+                mail.close()
+                mail.logout()
+                return "❌ Error searching emails."
+            
+            # Get email IDs
+            email_ids = messages[0].split()
+            if not email_ids:
+                mail.close()
+                mail.logout()
+                return f"📧 No emails found in {folder}."
+            
+            # Get recent emails
+            recent_ids = email_ids[-limit:] if len(email_ids) >= limit else email_ids
+            recent_ids.reverse()  # Show newest first
+            
+            email_list = []
+            for email_id in recent_ids:
+                try:
+                    status, msg_data = mail.fetch(email_id, '(RFC822)')
+                    if status == 'OK':
+                        email_body = msg_data[0][1]
+                        email_message = email.message_from_bytes(email_body)
+                        
+                        # Extract email details
+                        subject = self._decode_header(email_message.get('Subject', 'No Subject'))
+                        sender = self._decode_header(email_message.get('From', 'Unknown Sender'))
+                        date = email_message.get('Date', 'Unknown Date')
+                        
+                        # Get email body
+                        body = self._extract_email_body(email_message)
+                        
+                        # Check if read
+                        status_flags = mail.fetch(email_id, '(FLAGS)')[1][0].decode()
+                        is_read = '\\Seen' in status_flags
+                        
+                        email_list.append({
+                            'subject': subject,
+                            'sender': sender,
+                            'date': date,
+                            'body': body[:200] + "..." if len(body) > 200 else body,
+                            'is_read': is_read,
+                            'id': email_id.decode()
+                        })
+                        
+                except Exception as e:
+                    print(f"⚠️ Error processing email {email_id}: {e}")
+                    continue
+            
+            mail.close()
+            mail.logout()
+            
+            # Format response
+            response = f"📧 **{folder} Emails** ({len(email_list)} emails)\n\n"
+            
+            for i, email_data in enumerate(email_list, 1):
+                status_icon = "📬" if not email_data['is_read'] else "📭"
+                response += f"{status_icon} **{i}. {email_data['subject']}**\n"
+                response += f"   📤 From: {email_data['sender']}\n"
+                response += f"   📅 Date: {email_data['date']}\n"
+                response += f"   📝 Preview: {email_data['body']}\n\n"
+            
+            return response
+            
+        except imaplib.IMAP4.error as e:
+            return f"❌ IMAP error: {str(e)}"
+        except Exception as e:
+            return f"❌ Error reading emails: {str(e)}"
+    
+    def _get_imap_server(self) -> str:
+        """Get IMAP server for email provider."""
+        if not self.email_address:
+            return None
+        
+        domain = self.email_address.split('@')[1].lower()
+        
+        if 'gmail.com' in domain:
+            return 'imap.gmail.com'
+        elif 'outlook.com' in domain or 'hotmail.com' in domain:
+            return 'outlook.office365.com'
+        elif 'yahoo.com' in domain:
+            return 'imap.mail.yahoo.com'
+        else:
+            # Default to Gmail
+            return 'imap.gmail.com'
+    
+    def _decode_header(self, header: str) -> str:
+        """Decode email header."""
+        if not header:
+            return "No Subject"
+        
+        decoded_parts = decode_header(header)
+        decoded_string = ""
+        
+        for part, encoding in decoded_parts:
+            if isinstance(part, bytes):
+                if encoding:
+                    try:
+                        decoded_string += part.decode(encoding)
+                    except:
+                        decoded_string += part.decode('utf-8', errors='ignore')
+                else:
+                    decoded_string += part.decode('utf-8', errors='ignore')
+            else:
+                decoded_string += part
+        
+        return decoded_string
+    
+    def _extract_email_body(self, email_message) -> str:
+        """Extract email body content."""
+        body = ""
+        
+        if email_message.is_multipart():
+            for part in email_message.walk():
+                content_type = part.get_content_type()
+                content_disposition = str(part.get("Content-Disposition"))
+                
+                if content_type == "text/plain" and "attachment" not in content_disposition:
+                    try:
+                        body = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                        break
+                    except:
+                        continue
+        else:
+            try:
+                body = email_message.get_payload(decode=True).decode('utf-8', errors='ignore')
+            except:
+                body = str(email_message.get_payload())
+        
+        return body.strip()
+    
+    def get_unread_emails(self, limit: int = 5) -> str:
+        """Get unread emails."""
+        return self.read_emails(limit=limit, unread_only=True)
+    
+    def get_latest_emails(self, limit: int = 5) -> str:
+        """Get latest emails."""
+        return self.read_emails(limit=limit, unread_only=False)
+    
+    def mark_email_as_read(self, email_id: str) -> str:
+        """Mark an email as read."""
+        try:
+            if not all([self.email_address, self.email_password]):
+                return "❌ Email not configured."
+            
+            imap_server = self._get_imap_server()
+            if not imap_server:
+                return "❌ IMAP server not configured."
+            
+            mail = imaplib.IMAP4_SSL(imap_server)
+            mail.login(self.email_address, self.email_password)
+            mail.select('INBOX')
+            
+            mail.store(email_id, '+FLAGS', '\\Seen')
+            
+            mail.close()
+            mail.logout()
+            
+            return f"✅ Marked email {email_id} as read."
+            
+        except Exception as e:
+            return f"❌ Error marking email as read: {str(e)}"
+
     def get_email_help(self) -> str:
         """Get help information for email features."""
         return """📧 **Email Service Help**
@@ -519,6 +723,12 @@ For Outlook: Use your regular password or app password.
    • 'send email to john@example.com subject Hello body How are you?'
    • 'email sarah@company.com about Meeting scheduled for tomorrow'
    • 'send email to team@work.com with attachment report.pdf'
+
+📥 **Reading Emails:**
+   • 'read my emails' - Show latest emails
+   • 'unread emails' - Show unread emails only
+   • 'check inbox' - Check your inbox
+   • 'latest emails 10' - Show latest 10 emails
 
 📋 **Using Templates:**
    • 'send template business to client@company.com recipient_name John purpose discuss project'
@@ -540,6 +750,8 @@ For Outlook: Use your regular password or app password.
    • 'test email' - Test email configuration
 
 💡 **Examples:**
+   • 'read my emails' - Check your inbox
+   • 'unread emails' - Show unread messages
    • 'send email to manager@company.com subject Weekly Report body Here is this week's report'
    • 'email template thank_you to client@work.com reason your time additional_message for the great meeting'
    • 'add contact Jane Doe jane@company.com 555-5678 Acme Corp Great client'

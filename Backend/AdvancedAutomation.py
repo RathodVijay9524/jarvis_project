@@ -46,6 +46,15 @@ class JarvisAdvancedAutomation:
             self.calendar_service = None
             print("⚠️ Calendar service not available")
         
+        # Initialize email service
+        try:
+            from .EmailService import JarvisEmailService
+            self.email_service = JarvisEmailService()
+            print("✅ Email service initialized")
+        except ImportError:
+            self.email_service = None
+            print("⚠️ Email service not available")
+        
         # Enhanced application mappings
         self.app_mappings = {
             # Browsers
@@ -351,9 +360,15 @@ class JarvisAdvancedAutomation:
             elif "open" in query_lower and "folder" in query_lower:
                 return self.open_folder(query_lower)
             
-            # Email operations
+            # Email operations - Check reading first, then creation
+            elif ("read" in query_lower or "check" in query_lower or "unread" in query_lower) and ("email" in query_lower or "mail" in query_lower or "inbox" in query_lower):
+                return self._handle_email_reading(query_lower)
+            
             elif "email" in query_lower or "mail" in query_lower:
-                return self.create_email(query_lower)
+                if "send" in query_lower or "create" in query_lower:
+                    return self._handle_email_sending(query_lower)
+                else:
+                    return self.create_email(query_lower)
             
             # Music operations
             elif "play" in query_lower and ("music" in query_lower or "song" in query_lower or any(artist in query_lower for artist in ['taylor', 'bohemian', 'beatles', 'drake', 'adele'])):
@@ -1244,6 +1259,66 @@ Example: "OPEN INTELLIJ", "OPEN DISCORD", "OPEN VSCODE"
             
         except Exception as e:
             return f"❌ Error updating event: {str(e)}"
+    
+    def _handle_email_reading(self, query: str) -> str:
+        """Handle email reading queries."""
+        try:
+            if not self.email_service:
+                return "❌ Email service not available"
+            
+            query_lower = query.lower()
+            
+            # Check for unread emails
+            if "unread" in query_lower:
+                return self.email_service.get_unread_emails(limit=5)
+            
+            # Check for inbox or read emails
+            elif "inbox" in query_lower or "read" in query_lower or "check" in query_lower:
+                return self.email_service.get_latest_emails(limit=5)
+            
+            # Default to latest emails
+            else:
+                return self.email_service.get_latest_emails(limit=5)
+                
+        except Exception as e:
+            return f"❌ Error reading emails: {str(e)}"
+    
+    def _handle_email_sending(self, query: str) -> str:
+        """Handle email sending queries."""
+        try:
+            if not self.email_service:
+                return "❌ Email service not available"
+            
+            query_lower = query.lower()
+            
+            # Parse email sending command
+            # Format: "send email to recipient@example.com subject Hello body Message"
+            import re
+            
+            # Extract email address
+            email_pattern = r'to\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})'
+            email_match = re.search(email_pattern, query_lower)
+            
+            if not email_match:
+                return "❌ Please specify recipient email address. Format: 'send email to recipient@example.com subject Hello body Message'"
+            
+            recipient = email_match.group(1)
+            
+            # Extract subject
+            subject_pattern = r'subject\s+([^b]*?)(?=\s+body|$)'
+            subject_match = re.search(subject_pattern, query_lower)
+            subject = subject_match.group(1).strip() if subject_match else "Message from JARVIS"
+            
+            # Extract body
+            body_pattern = r'body\s+(.+)$'
+            body_match = re.search(body_pattern, query_lower)
+            body = body_match.group(1).strip() if body_match else "Hello! This is a message from JARVIS AI Assistant."
+            
+            # Send the email
+            return self.email_service.send_email(recipient, subject, body)
+            
+        except Exception as e:
+            return f"❌ Error sending email: {str(e)}"
 
 if __name__ == "__main__":
     # Test the advanced automation

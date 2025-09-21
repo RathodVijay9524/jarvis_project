@@ -14,6 +14,12 @@ Create a `.env` file in the project root with your API keys:
 # Required: Groq API Key for AI Model
 GROQ_API_KEY=your_groq_api_key_here
 
+# Email Service Configuration (✅ TESTED WORKING)
+EMAIL_ADDRESS=your_email@gmail.com
+EMAIL_PASSWORD=your_app_password_here
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+
 # Optional: Additional API Keys
 COHERE_API_KEY=your_cohere_api_key_here
 NEWS_API_KEY=your_news_api_key_here
@@ -23,6 +29,8 @@ WEATHER_API_KEY=your_weather_api_key_here
 USERNAME=User
 ASSISTANT_NAME=JARVIS
 ```
+
+**Note:** For Gmail, use an App Password instead of your regular password. Go to Google Account Settings → Security → 2-Step Verification → App passwords.
 
 ### 3. Get Your Groq API Key
 1. Visit [https://console.groq.com/](https://console.groq.com/)
@@ -61,6 +69,10 @@ python Main.py voice
 ✅ **Web Search** - Intelligent search with fallback responses  
 ✅ **Music Control** - Play music via Spotify, YouTube Music  
 ✅ **App Control** - Open installed applications, files, and folders  
+✅ **Email Service** - Send emails, templates, contact management (Gmail/Outlook/Yahoo)  
+✅ **News Service** - Latest news from multiple sources with categorization  
+✅ **Clipboard Service** - Clipboard history, snippets, text formatting  
+✅ **Calendar System** - Events, reminders, schedule management  
 ✅ **Memory System** - Remembers your name and conversation history  
 ✅ **AI Personality** - Context-aware responses and emotional intelligence  
 
@@ -80,5 +92,10 @@ python Main.py voice
 - "open calculator"
 - "my name is [Your Name]"
 - "what's the latest news"
+- "send email to test@example.com subject Hello body How are you?"
+- "remind me to call mom in 2 hours"
+- "show my calendar for today"
+- "copy Hello World"
+- "news technology"
 
 Enjoy your JARVIS AI Assistant! 🤖✨
