@@ -57,7 +57,7 @@ class MessageBubble(QFrame):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5)
         
-        # Header with avatar and name
+        # Header with avatar and name (like first image)
         header_layout = QHBoxLayout()
         header_layout.setSpacing(10)
         
@@ -83,25 +83,22 @@ class MessageBubble(QFrame):
                 }
             """)
         
-        # Online indicator
-        online_indicator = QLabel()
-        online_indicator.setFixedSize(8, 8)
-        online_indicator.setStyleSheet("""
-            QLabel {
-                border-radius: 4px;
-                background-color: #4ade80;
-                border: 1px solid white;
-            }
-        """)
+        # Online indicator (small green dot)
+        online_indicator = QLabel("●")
+        online_indicator.setStyleSheet("color: #4ade80; font-size: 8px; margin-left: -6px; margin-top: 20px;")
         
-        # Name and timestamp
+        # Name and timestamp layout
         name_layout = QVBoxLayout()
-        name_label = QLabel("You" if self.is_user else "JARVIS")
+        name_layout.setSpacing(0)
+        
+        name_label = QLabel("AI Assistant" if not self.is_user else "You")
         name_label.setStyleSheet("""
             QLabel {
                 color: #374151;
                 font-weight: 600;
                 font-size: 14px;
+                margin: 0;
+                padding: 0;
             }
         """)
         
@@ -110,16 +107,26 @@ class MessageBubble(QFrame):
             QLabel {
                 color: #9ca3af;
                 font-size: 12px;
+                margin: 0;
+                padding: 0;
             }
         """)
         
         name_layout.addWidget(name_label)
         name_layout.addWidget(time_label)
         
-        header_layout.addWidget(avatar)
-        header_layout.addWidget(online_indicator)
-        header_layout.addLayout(name_layout)
-        header_layout.addStretch()
+        if self.is_user:
+            # For user messages, align everything to the right
+            header_layout.addStretch()
+            header_layout.addLayout(name_layout)
+            header_layout.addWidget(online_indicator)
+            header_layout.addWidget(avatar)
+        else:
+            # For AI messages, align everything to the left
+            header_layout.addWidget(avatar)
+            header_layout.addWidget(online_indicator)
+            header_layout.addLayout(name_layout)
+            header_layout.addStretch()
         
         # Message content
         message_label = QLabel(self.message)
@@ -127,7 +134,7 @@ class MessageBubble(QFrame):
         message_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         
         if self.is_user:
-            # User message styling
+            # User message styling (right-aligned)
             message_label.setStyleSheet("""
                 QLabel {
                     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
@@ -137,10 +144,14 @@ class MessageBubble(QFrame):
                     border-radius: 18px;
                     font-size: 14px;
                     font-weight: 500;
+                    margin-left: 200px;
+                    margin-right: 0px;
                 }
             """)
+            # Align user messages to the right
+            message_label.setAlignment(Qt.AlignRight)
         else:
-            # AI message styling
+            # AI message styling (left-aligned)
             message_label.setStyleSheet("""
                 QLabel {
                     background-color: white;
@@ -149,13 +160,18 @@ class MessageBubble(QFrame):
                     border-radius: 18px;
                     font-size: 14px;
                     border: 1px solid #e5e7eb;
+                    margin-left: 0px;
+                    margin-right: 200px;
                 }
             """)
+            # Align AI messages to the left
+            message_label.setAlignment(Qt.AlignLeft)
         
-        # Action buttons for AI messages
+        # Action buttons for AI messages (positioned above message like first image)
         if not self.is_user:
             actions_layout = QHBoxLayout()
             actions_layout.setSpacing(8)
+            actions_layout.setContentsMargins(0, 0, 0, 5)
             
             # Action buttons
             buttons = [
@@ -167,14 +183,14 @@ class MessageBubble(QFrame):
             
             for icon, action in buttons:
                 btn = QPushButton(icon)
-                btn.setFixedSize(28, 28)
+                btn.setFixedSize(24, 24)
                 btn.setStyleSheet("""
                     QPushButton {
                         border: none;
-                        border-radius: 14px;
+                        border-radius: 12px;
                         background-color: #f3f4f6;
                         color: #6b7280;
-                        font-size: 12px;
+                        font-size: 10px;
                     }
                     QPushButton:hover {
                         background-color: #e5e7eb;
@@ -295,6 +311,25 @@ class ConversationSidebar(QWidget):
                 margin-top: 10px;
             }
         """)
+        
+        # Search input
+        search_input = QLineEdit()
+        search_input.setPlaceholderText("🔍 Search conversations...")
+        search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 12px;
+                color: #374151;
+            }
+            QLineEdit:focus {
+                border-color: #667eea;
+                outline: none;
+            }
+        """)
+        search_input.returnPressed.connect(self.search_conversations)
         
         # New chat button
         new_chat_btn = QPushButton("+ New Chat")
@@ -444,6 +479,7 @@ class ConversationSidebar(QWidget):
         # Add all components to main layout
         layout.addLayout(header_layout)
         layout.addWidget(conversations_label)
+        layout.addWidget(search_input)
         layout.addWidget(new_chat_btn)
         layout.addWidget(current_chat)
         layout.addWidget(prev_chat)
@@ -455,6 +491,10 @@ class ConversationSidebar(QWidget):
     def new_chat(self):
         """Start a new chat conversation."""
         print("Starting new chat...")
+    
+    def search_conversations(self):
+        """Search through conversations."""
+        print("Searching conversations...")
 
 class ChatArea(QWidget):
     """Main chat area with modern message display."""
@@ -524,6 +564,8 @@ class ChatArea(QWidget):
         settings_layout.addStretch()
         
         header_layout.addLayout(settings_layout)
+        
+        # No main search input here - it's handled by InputArea at the bottom
         
         # Scrollable messages area
         self.scroll_area = QScrollArea()
@@ -632,18 +674,25 @@ class ChatArea(QWidget):
     
     def remove_last_message(self):
         """Remove the last message from the chat."""
-        if self.messages_layout.count() > 1:  # More than just the spacer
+        # Find the last message widget (before the spacer)
+        item_count = self.messages_layout.count()
+        if item_count > 1:  # More than just the spacer
             # Remove the last widget (before the spacer)
-            item = self.messages_layout.itemAt(self.messages_layout.count() - 2)
+            item = self.messages_layout.itemAt(item_count - 2)
             if item and item.widget():
                 widget = item.widget()
                 self.messages_layout.removeWidget(widget)
                 widget.deleteLater()
+                print(f"✅ Removed last message widget")
+            else:
+                print(f"⚠️ Could not find widget to remove")
+    
 
 class InputArea(QWidget):
     """Modern input area with quick actions and voice controls."""
     
     message_sent = pyqtSignal(str)
+    voice_input_requested = pyqtSignal()
     
     def __init__(self):
         super().__init__()
@@ -651,7 +700,7 @@ class InputArea(QWidget):
     
     def setup_ui(self):
         """Setup the input area UI."""
-        self.setFixedHeight(120)
+        self.setFixedHeight(80)
         self.setStyleSheet("""
             QWidget {
                 background-color: #f9fafb;
@@ -659,15 +708,11 @@ class InputArea(QWidget):
             }
         """)
         
-        layout = QVBoxLayout()
+        layout = QHBoxLayout()
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
         
-        # Main input area
-        input_layout = QHBoxLayout()
-        input_layout.setSpacing(12)
-        
-        # Text input
+        # Single text input (like first image)
         self.text_input = QLineEdit()
         self.text_input.setPlaceholderText("Type your message...")
         self.text_input.setStyleSheet("""
@@ -678,6 +723,7 @@ class InputArea(QWidget):
                 padding: 12px 16px;
                 font-size: 14px;
                 color: #374151;
+                min-height: 20px;
             }
             QLineEdit:focus {
                 border-color: #667eea;
@@ -688,48 +734,9 @@ class InputArea(QWidget):
         
         # Sparkle icon
         sparkle_label = QLabel("✨")
-        sparkle_label.setStyleSheet("font-size: 16px; color: #f59e0b;")
+        sparkle_label.setStyleSheet("font-size: 16px; color: #f59e0b; margin-left: 8px;")
         
-        input_layout.addWidget(self.text_input)
-        input_layout.addWidget(sparkle_label)
-        
-        # Quick actions
-        actions_label = QLabel("Quick actions:")
-        actions_label.setStyleSheet("color: #6b7280; font-size: 12px;")
-        
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(8)
-        
-        quick_actions = [
-            ("💡", "Explain"),
-            ("🔍", "Analyze"), 
-            ("✨", "Help")
-        ]
-        
-        for icon, text in quick_actions:
-            btn = QPushButton(f"{icon} {text}")
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: white;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 8px;
-                    padding: 8px 12px;
-                    color: #374151;
-                    font-size: 12px;
-                }
-                QPushButton:hover {
-                    background-color: #f3f4f6;
-                    border-color: #d1d5db;
-                }
-            """)
-            btn.clicked.connect(lambda checked, t=text: self.on_quick_action(t))
-            actions_layout.addWidget(btn)
-        
-        actions_layout.addStretch()
-        
-        # Character count and controls
-        controls_layout = QHBoxLayout()
-        
+        # Character count
         char_count = QLabel("0/2000")
         char_count.setStyleSheet("color: #6b7280; font-size: 12px;")
         
@@ -747,7 +754,7 @@ class InputArea(QWidget):
                 background-color: #e5e7eb;
             }
         """)
-        voice_btn.clicked.connect(self.toggle_voice)
+        voice_btn.clicked.connect(self.start_voice_input)
         
         # Send button
         send_btn = QPushButton("🚀")
@@ -768,15 +775,11 @@ class InputArea(QWidget):
         """)
         send_btn.clicked.connect(self.send_message)
         
-        controls_layout.addWidget(char_count)
-        controls_layout.addStretch()
-        controls_layout.addWidget(voice_btn)
-        controls_layout.addWidget(send_btn)
-        
-        layout.addLayout(input_layout)
-        layout.addWidget(actions_label)
-        layout.addLayout(actions_layout)
-        layout.addLayout(controls_layout)
+        layout.addWidget(self.text_input)
+        layout.addWidget(sparkle_label)
+        layout.addWidget(char_count)
+        layout.addWidget(voice_btn)
+        layout.addWidget(send_btn)
         
         self.setLayout(layout)
     
@@ -784,8 +787,11 @@ class InputArea(QWidget):
         """Send the current message."""
         message = self.text_input.text().strip()
         if message:
+            print(f"📤 Sending message: {message}")
             self.message_sent.emit(message)
             self.text_input.clear()
+        else:
+            print("⚠️ Empty message, not sending")
     
     def on_quick_action(self, action: str):
         """Handle quick action button clicks."""
@@ -799,18 +805,29 @@ class InputArea(QWidget):
             self.text_input.setText(quick_messages[action])
             self.text_input.setFocus()
     
-    def toggle_voice(self):
-        """Toggle voice input."""
-        print("Voice input toggled...")
+    def start_voice_input(self):
+        """Start voice input."""
+        # Emit signal to main window
+        self.voice_input_requested.emit()
 
 class ModernJarvisGUI(QMainWindow):
     """Modern JARVIS GUI with sleek design inspired by Neural Chat AI."""
+    
+    # Qt signals for thread communication
+    response_ready = pyqtSignal(str, bool)  # message, is_user
+    remove_last_signal = pyqtSignal()
+    initialization_ready = pyqtSignal(str)  # status message
     
     def __init__(self):
         super().__init__()
         self.chatbot = None
         self.setup_ui()
         self.initialize_jarvis()
+        
+        # Connect signals
+        self.response_ready.connect(self.add_response_message)
+        self.remove_last_signal.connect(self.remove_last_message)
+        self.initialization_ready.connect(self.add_initialization_message)
     
     def setup_ui(self):
         """Setup the main UI."""
@@ -855,6 +872,11 @@ class ModernJarvisGUI(QMainWindow):
         
         # Connect signals
         self.input_area.message_sent.connect(self.handle_user_message)
+        self.input_area.voice_input_requested.connect(self.start_voice_input)
+        
+        # Store references for easy access
+        self.chat_area_widget = self.chat_area
+        self.input_area_widget = self.input_area
         
         # Apply modern styling
         self.apply_modern_styling()
@@ -880,44 +902,98 @@ class ModernJarvisGUI(QMainWindow):
                 try:
                     self.chatbot = JarvisChatbot()
                     print("✅ JARVIS initialized successfully")
+                    self.initialization_ready.emit("✅ JARVIS initialized successfully!")
                 except Exception as e:
                     print(f"❌ Failed to initialize JARVIS: {e}")
-                    self.show_error("JARVIS Initialization Error", 
-                                   f"Failed to initialize JARVIS: {str(e)}")
+                    self.initialization_ready.emit(f"❌ JARVIS initialization failed: {str(e)}")
             
-        # Run initialization in background thread
-        init_thread = threading.Thread(target=init_jarvis, daemon=True)
-        init_thread.start()
+            # Run initialization in background thread
+            init_thread = threading.Thread(target=init_jarvis, daemon=True)
+            init_thread.start()
         else:
-            self.show_error("Missing Dependencies", 
-                           "JARVIS backend components are not available.")
+            print("⚠️ JARVIS backend components not available")
+            self.initialization_ready.emit("❌ JARVIS backend components not available")
     
-    def handle_user_message(self, message: str):
+    def handle_user_message(self, message: str, use_voice: bool = False):
         """Handle user message and get JARVIS response."""
-        if not self.chatbot:
-            self.chat_area.add_message("JARVIS is initializing... Please wait a moment.", is_user=False)
-            return
+        print(f"📝 User message: {message}")
         
-        # Add user message to chat
+        # Add user message to chat first
         self.chat_area.add_message(message, is_user=True)
         
-        # Add typing indicator
+        # Add typing indicator immediately
         self.chat_area.add_message("JARVIS is thinking...", is_user=False)
         
         # Get JARVIS response in background thread
         def get_response():
             try:
-                response = self.chatbot.respond(message)
-                # Remove typing indicator and add real response
-                self.chat_area.remove_last_message()
-                self.chat_area.add_message(response, is_user=False)
+                # Make sure JARVIS is initialized
+                if not self.chatbot:
+                    print("🔧 Initializing JARVIS...")
+                    from Backend.Chatbot import JarvisChatbot
+                    self.chatbot = JarvisChatbot()
+                    print("✅ JARVIS initialized successfully")
+                
+                print(f"🤔 Getting response for: {message}")
+                response = self.chatbot.respond(message, use_voice=use_voice)
+                print(f"✅ Got response: {response[:50]}...")
+                
+                # Remove typing indicator and add real response using signals
+                self.remove_last_signal.emit()
+                self.response_ready.emit(response, False)  # False = not user message
+                
+                # Speak response if voice is enabled
+                if use_voice:
+                    self.speak_response(response)
+                    
             except Exception as e:
+                print(f"❌ Error getting response: {e}")
                 error_msg = f"Error: {str(e)}"
-                self.chat_area.remove_last_message()
-                self.chat_area.add_message(error_msg, is_user=False)
+                self.remove_last_signal.emit()
+                self.response_ready.emit(error_msg, False)
         
         response_thread = threading.Thread(target=get_response, daemon=True)
         response_thread.start()
+    
+    def speak_response(self, text: str):
+        """Speak JARVIS response using TTS."""
+        try:
+            from Backend.TextToSpeech import speak
+            speak(text)
+        except Exception as e:
+            print(f"TTS Error: {e}")
+    
+    def start_voice_input(self):
+        """Start voice input for user."""
+        try:
+            from Backend.SpeechToText import JarvisSpeechToText
+            stt = JarvisSpeechToText()
+            
+            def listen_for_voice():
+                try:
+                    text = stt.listen_once()
+                    if text and text.strip():
+                        self.handle_user_message(text.strip(), use_voice=True)
+                except Exception as e:
+                    self.response_ready.emit(f"Voice input error: {str(e)}", False)
+            
+            voice_thread = threading.Thread(target=listen_for_voice, daemon=True)
+            voice_thread.start()
+            
+        except Exception as e:
+            self.response_ready.emit(f"Voice system error: {str(e)}", False)
+    
+    def add_response_message(self, message: str, is_user: bool = False):
+        """Add a response message to the chat area (signal handler)."""
+        self.chat_area.add_message(message, is_user=is_user)
+    
+    def add_initialization_message(self, message: str):
+        """Add an initialization status message (signal handler)."""
+        self.chat_area.add_message(message, is_user=False)
+    
+    def remove_last_message(self):
+        """Remove the last message from the chat area (signal handler)."""
+        self.chat_area.remove_last_message()
     
     def show_error(self, title: str, message: str):
         """Show error dialog."""

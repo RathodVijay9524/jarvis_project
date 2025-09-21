@@ -346,6 +346,19 @@ class JarvisAdvancedAutomation:
             elif "email" in query_lower or "mail" in query_lower:
                 return self.create_email(query_lower)
             
+            # Music operations
+            elif "play" in query_lower and ("music" in query_lower or "song" in query_lower or any(artist in query_lower for artist in ['taylor', 'bohemian', 'beatles', 'drake', 'adele'])):
+                return self.play_music(query_lower)
+            
+            elif "stop" in query_lower and ("music" in query_lower or "song" in query_lower):
+                return self.stop_music()
+            
+            elif "pause" in query_lower and ("music" in query_lower or "song" in query_lower):
+                return self.pause_music()
+            
+            elif "volume" in query_lower and ("music" in query_lower or "song" in query_lower):
+                return self.set_music_volume(query_lower)
+            
             # Application operations
             elif ("list" in query_lower or "show" in query_lower) and ("app" in query_lower or "application" in query_lower or "installed" in query_lower):
                 return self.list_installed_applications()
@@ -910,6 +923,98 @@ Example: "OPEN INTELLIJ", "OPEN DISCORD", "OPEN VSCODE"
             return "🔄 Restart command sent"
         except Exception as e:
             return f"❌ Error restarting: {str(e)}"
+    
+    def play_music(self, query: str) -> str:
+        """
+        Play music based on the query. Handles both local files and streaming.
+        """
+        try:
+            query_lower = query.lower()
+            
+            # Extract song/artist name from query
+            song_query = query_lower.replace("play", "").replace("music", "").replace("song", "").strip()
+            
+            # If no specific song mentioned, try to open Spotify or YouTube Music
+            if not song_query or song_query in ["", "some", "a"]:
+                # Try Spotify first
+                try:
+                    if "spotify" in self.installed_apps:
+                        subprocess.Popen([self.installed_apps["spotify"]], shell=True)
+                        return "🎵 Opening Spotify for music playback"
+                    else:
+                        webbrowser.open("https://open.spotify.com")
+                        return "🎵 Opening Spotify Web Player for music"
+                except:
+                    webbrowser.open("https://music.youtube.com")
+                    return "🎵 Opening YouTube Music for music playback"
+            
+            # For specific songs, search on YouTube Music
+            else:
+                search_url = f"https://music.youtube.com/search?q={song_query.replace(' ', '+')}"
+                webbrowser.open(search_url)
+                return f"🎵 Searching for '{song_query}' on YouTube Music"
+                
+        except Exception as e:
+            return f"❌ Music playback error: {str(e)}"
+    
+    def stop_music(self) -> str:
+        """Stop music playbook."""
+        try:
+            # Try to stop any running music applications
+            music_processes = ["spotify.exe", "musicbee.exe", "vlc.exe", "wmplayer.exe"]
+            stopped = []
+            
+            for proc in psutil.process_iter(['pid', 'name']):
+                try:
+                    if proc.info['name'].lower() in music_processes:
+                        proc.terminate()
+                        stopped.append(proc.info['name'])
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+            
+            if stopped:
+                return f"⏹️ Stopped music applications: {', '.join(stopped)}"
+            else:
+                return "⏹️ No music applications found running"
+                
+        except Exception as e:
+            return f"❌ Error stopping music: {str(e)}"
+    
+    def pause_music(self) -> str:
+        """Pause music playback."""
+        try:
+            # Send media key to pause/play
+            if self.system == "windows":
+                import keyboard
+                keyboard.send('play/pause media')
+                return "⏸️ Sent pause/play command to media player"
+            else:
+                return "⏸️ Pause functionality not available on this system"
+                
+        except Exception as e:
+            return f"❌ Error pausing music: {str(e)}"
+    
+    def set_music_volume(self, query: str) -> str:
+        """Set music volume."""
+        try:
+            # Extract volume level from query
+            import re
+            volume_match = re.search(r'(\d+)', query)
+            if volume_match:
+                volume = int(volume_match.group(1))
+                volume = max(0, min(100, volume))  # Clamp between 0-100
+                
+                if self.system == "windows":
+                    # Use Windows volume control
+                    subprocess.run(f'nircmd.exe setsysvolume {int(volume * 655.35)}', shell=True)
+                    return f"🔊 Set system volume to {volume}%"
+                else:
+                    return f"🔊 Volume control not available on this system"
+            else:
+                return "❌ Please specify a volume level (0-100)"
+                
+        except Exception as e:
+            return f"❌ Error setting volume: {str(e)}"
 
 if __name__ == "__main__":
     # Test the advanced automation

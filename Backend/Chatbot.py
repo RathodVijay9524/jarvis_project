@@ -164,12 +164,32 @@ class JarvisChatbot:
             
             # Weather queries
             if "weather" in query_lower:
-                location = "your location"  # Default
+                location = None
                 words = query.split()
+                
+                # Look for location indicators
                 for i, word in enumerate(words):
                     if word.lower() in ["in", "at", "for"] and i + 1 < len(words):
                         location = " ".join(words[i+1:])
                         break
+                
+                # If no location found, try to extract city name after "weather"
+                if not location:
+                    weather_index = -1
+                    for i, word in enumerate(words):
+                        if word.lower() == "weather":
+                            weather_index = i
+                            break
+                    
+                    if weather_index >= 0 and weather_index + 1 < len(words):
+                        # Take the next word as potential location
+                        potential_location = words[weather_index + 1]
+                        # If it's a single word, use it; otherwise try to get more context
+                        if weather_index + 2 < len(words):
+                            location = " ".join(words[weather_index + 1:])
+                        else:
+                            location = potential_location
+                
                 return self.search_engine.get_weather(location)
             
             # News queries
