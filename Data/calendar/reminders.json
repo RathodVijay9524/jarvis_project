@@ -1,10 +1,66 @@
 [
   {
     "id": 1,
-    "title": "Test Meeting",
-    "reminder_time": "2025-09-21T13:45:00",
-    "description": "Event reminder: Test Meeting",
-    "created_at": "2025-09-21T00:15:20.530849",
+    "title": "test the calendar",
+    "reminder_time": "2025-09-21T16:10:00",
+    "description": "",
+    "created_at": "2025-09-21T15:10:26.861216",
+    "status": "active"
+  },
+  {
+    "id": 2,
+    "title": "call mom",
+    "reminder_time": "2025-09-21T17:12:00",
+    "description": "",
+    "created_at": "2025-09-21T15:12:49.656416",
+    "status": "active"
+  },
+  {
+    "id": 3,
+    "title": "buy groceries",
+    "reminder_time": "2025-09-21T18:00:00",
+    "description": "",
+    "created_at": "2025-09-21T15:13:08.490098",
+    "status": "active"
+  },
+  {
+    "id": 4,
+    "title": "lunch with friends",
+    "reminder_time": "2025-09-21T23:45:00",
+    "description": "Event reminder: lunch with friends",
+    "created_at": "2025-09-21T15:13:54.690679",
+    "status": "active"
+  },
+  {
+    "id": 5,
+    "title": "project presentati monday",
+    "reminder_time": "2025-09-21T23:45:00",
+    "description": "Event reminder: project presentati monday",
+    "created_at": "2025-09-21T15:14:26.730772",
+    "status": "active"
+  },
+  {
+    "id": 6,
+    "title": "what reminders do i have.",
+    "reminder_time": "2025-09-21T16:15:00",
+    "description": "",
+    "created_at": "2025-09-21T15:15:52.642368",
+    "status": "active"
+  },
+  {
+    "id": 7,
+    "title": "call mom",
+    "reminder_time": "2025-09-21T17:32:00",
+    "description": "",
+    "created_at": "2025-09-21T15:32:35.036220",
+    "status": "active"
+  },
+  {
+    "id": 8,
+    "title": "lunch",
+    "reminder_time": "2025-09-21T23:45:00",
+    "description": "Event reminder: lunch",
+    "created_at": "2025-09-21T15:33:22.589504",
     "status": "active"
   }
 ]

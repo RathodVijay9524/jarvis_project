@@ -1,15 +1,16 @@
 {
   "user_preferences": {},
   "conversation_patterns": {
-    "general": 8,
-    "greeting": 2,
-    "request": 10
+    "general": 14,
+    "greeting": 3,
+    "request": 11,
+    "command": 2
   },
   "response_effectiveness": {},
   "topic_interest": {
-    "general": 18,
+    "general": 27,
     "technology": 1,
-    "weather": 1
+    "weather": 2
   },
-  "interaction_count": 20
+  "interaction_count": 30
 }

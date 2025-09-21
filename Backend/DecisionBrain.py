@@ -30,7 +30,7 @@ You will decide whether a query is a 'general' query, a 'realtime' query, or is 
 
 -> Respond with 'realtime ( query )' if a query requires real-time up-to-date information from the internet like if the query is 'who is elon musk?' respond with 'realtime who is elon musk?', if the query is 'what's mark's networth?' respond with 'realtime what's mark's networth?', if the query is 'what's the weather outside?' respond with 'realtime what's the weather outside?', if the query is 'tell me about kaushik shresth.' respond with 'realtime tell me about kaushik shresth.', if the query is 'what is the latest news?' respond with 'realtime what is the latest news?', if the query is 'current time' respond with 'realtime current time', if the query is 'today's date' respond with 'realtime today's date'
 
--> Respond with 'automation ( query )' if the query is asking to perform any task or automation like opening apps, creating files, controlling system, etc. like if the query is 'open facebook and instagram.' respond with 'automation open facebook and instagram.', if the query is 'Remind me when it's 10 PM.' respond with 'automation Remind me when it's 10 PM.', if the query is 'Write a song for me.' respond with 'automation Write a song for me.', if the query is 'Generate an image of tony stark.' respond with 'automation Generate an image of tony stark.', if the query is 'open notepad' respond with 'automation open notepad', if the query is 'create a file' respond with 'automation create a file', if the query is 'close all windows' respond with 'automation close all windows', if the query is 'send email' respond with 'automation send email'
+-> Respond with 'automation ( query )' if the query is asking to perform any task or automation like opening apps, creating files, controlling system, calendar/schedule management, etc. like if the query is 'open facebook and instagram.' respond with 'automation open facebook and instagram.', if the query is 'Remind me when it's 10 PM.' respond with 'automation Remind me when it's 10 PM.', if the query is 'Write a song for me.' respond with 'automation Write a song for me.', if the query is 'Generate an image of tony stark.' respond with 'automation Generate an image of tony stark.', if the query is 'open notepad' respond with 'automation open notepad', if the query is 'create a file' respond with 'automation create a file', if the query is 'close all windows' respond with 'automation close all windows', if the query is 'send email' respond with 'automation send email', if the query is 'show my calendar' respond with 'automation show my calendar', if the query is 'what events do I have' respond with 'automation what events do I have', if the query is 'show my schedule for tomorrow' respond with 'automation show my schedule for tomorrow', if the query is 'what reminders do I have' respond with 'automation what reminders do I have'
 
 Remember:
 - Only classify the query type, don't answer it
@@ -97,8 +97,8 @@ Remember:
             'open', 'close', 'start', 'stop', 'launch', 'run', 'execute',
             'create', 'make', 'write', 'generate', 'send', 'email',
             'file', 'folder', 'document', 'notepad', 'calculator',
-            'reminder', 'remind', 'timer', 'schedule', 'shutdown',
-            'facebook', 'instagram', 'youtube', 'chrome', 'browser'
+            'reminder', 'remind', 'timer', 'schedule', 'calendar', 'event',
+            'shutdown', 'facebook', 'instagram', 'youtube', 'chrome', 'browser'
         ]
         
         # Realtime keywords (enhanced)
@@ -119,7 +119,13 @@ Remember:
             'how are you', 'what are you thinking', 'tell me about yourself'
         ]
         
-        # Check for automation
+        # Check for automation (with priority for calendar/schedule queries)
+        # Calendar/schedule queries take priority over realtime
+        if any(cal_word in query_lower for cal_word in ['calendar', 'schedule', 'event', 'reminder']):
+            if any(action in query_lower for action in ['show', 'view', 'list', 'what', 'my']):
+                return 'automation'
+        
+        # Check for other automation keywords
         for keyword in automation_keywords:
             if keyword in query_lower:
                 return 'automation'

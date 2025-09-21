@@ -37,6 +37,15 @@ class JarvisAdvancedAutomation:
         # Detect installed applications
         self.installed_apps = self._detect_installed_applications()
         
+        # Initialize calendar service
+        try:
+            from .CalendarService import JarvisCalendarService
+            self.calendar_service = JarvisCalendarService()
+            print("✅ Calendar service initialized")
+        except ImportError:
+            self.calendar_service = None
+            print("⚠️ Calendar service not available")
+        
         # Enhanced application mappings
         self.app_mappings = {
             # Browsers
@@ -358,6 +367,22 @@ class JarvisAdvancedAutomation:
             
             elif "volume" in query_lower and ("music" in query_lower or "song" in query_lower):
                 return self.set_music_volume(query_lower)
+            
+            # Calendar and Reminder operations - Check display queries FIRST
+            elif ("show" in query_lower or "view" in query_lower or "what" in query_lower) and ("calendar" in query_lower or "schedule" in query_lower or "event" in query_lower):
+                return self.show_calendar(query_lower)
+            
+            elif ("what" in query_lower or "show" in query_lower or "list" in query_lower) and ("reminder" in query_lower):
+                return self.calendar_service.list_reminders(status="active")
+            
+            elif ("remind me" in query_lower or "set reminder" in query_lower) and not ("what" in query_lower or "show" in query_lower or "list" in query_lower):
+                return self.create_reminder(query_lower)
+            
+            elif "create event" in query_lower or ("schedule" in query_lower and "create" in query_lower):
+                return self.create_event(query_lower)
+            
+            elif "update" in query_lower and ("meeting" in query_lower or "event" in query_lower):
+                return self.update_event(query_lower)
             
             # Application operations
             elif ("list" in query_lower or "show" in query_lower) and ("app" in query_lower or "application" in query_lower or "installed" in query_lower):
@@ -1015,6 +1040,210 @@ Example: "OPEN INTELLIJ", "OPEN DISCORD", "OPEN VSCODE"
                 
         except Exception as e:
             return f"❌ Error setting volume: {str(e)}"
+    
+    def create_reminder(self, query: str) -> str:
+        """Create a reminder based on the query."""
+        try:
+            if not self.calendar_service:
+                return "❌ Calendar service not available"
+            
+            # Parse reminder from query
+            import re
+            from datetime import datetime, timedelta
+            
+            query_lower = query.lower()
+            
+            # Extract reminder text
+            reminder_text = query_lower.replace("remind me to", "").replace("remind me about", "").replace("set reminder", "").strip()
+            
+            # Extract time information
+            time_match = None
+            reminder_time = None
+            
+            # Look for time patterns
+            time_patterns = [
+                r"in (\d+) hours?",
+                r"in (\d+) minutes?",
+                r"at (\d+):?(\d*)\s*(am|pm)?",
+                r"tomorrow",
+                r"today"
+            ]
+            
+            for pattern in time_patterns:
+                match = re.search(pattern, query_lower)
+                if match:
+                    time_match = match
+                    break
+            
+            if time_match:
+                if "in" in time_match.group(0):
+                    # Relative time
+                    number = int(time_match.group(1))
+                    if "hour" in time_match.group(0):
+                        reminder_time = (datetime.now() + timedelta(hours=number)).strftime("%Y-%m-%d %H:%M")
+                    elif "minute" in time_match.group(0):
+                        reminder_time = (datetime.now() + timedelta(minutes=number)).strftime("%Y-%m-%d %H:%M")
+                elif "at" in time_match.group(0):
+                    # Specific time
+                    hour = int(time_match.group(1))
+                    minute = int(time_match.group(2)) if time_match.group(2) else 0
+                    am_pm = time_match.group(3) if len(time_match.groups()) > 2 else None
+                    
+                    if am_pm == "pm" and hour != 12:
+                        hour += 12
+                    elif am_pm == "am" and hour == 12:
+                        hour = 0
+                    
+                    today = datetime.now().replace(hour=hour, minute=minute, second=0, microsecond=0)
+                    reminder_time = today.strftime("%Y-%m-%d %H:%M")
+                elif "tomorrow" in time_match.group(0):
+                    tomorrow = datetime.now() + timedelta(days=1)
+                    reminder_time = tomorrow.replace(hour=9, minute=0).strftime("%Y-%m-%d %H:%M")
+                elif "today" in time_match.group(0):
+                    today = datetime.now()
+                    reminder_time = today.replace(hour=17, minute=0).strftime("%Y-%m-%d %H:%M")
+            else:
+                # Default to 1 hour from now
+                reminder_time = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M")
+            
+            # Clean reminder text
+            reminder_text = re.sub(r"(in \d+ hours?|in \d+ minutes?|at \d+:?\d*\s*(am|pm)?|tomorrow|today)", "", reminder_text).strip()
+            if not reminder_text:
+                reminder_text = "Reminder"
+            
+            # Create reminder
+            result = self.calendar_service.create_reminder(reminder_text, reminder_time)
+            return result
+            
+        except Exception as e:
+            return f"❌ Error creating reminder: {str(e)}"
+    
+    def create_event(self, query: str) -> str:
+        """Create a calendar event based on the query."""
+        try:
+            if not self.calendar_service:
+                return "❌ Calendar service not available"
+            
+            import re
+            from datetime import datetime, timedelta
+            
+            query_lower = query.lower()
+            
+            # Extract event title
+            event_title = query_lower.replace("create event", "").replace("schedule", "").strip()
+            
+            # Extract date and time
+            date_match = None
+            time_match = None
+            event_date = None
+            event_time = None
+            
+            # Date patterns
+            date_patterns = [
+                r"tomorrow",
+                r"today",
+                r"on (\w+)",  # on Friday
+                r"next (\w+)",  # next Monday
+            ]
+            
+            # Time patterns
+            time_patterns = [
+                r"at (\d+):?(\d*)\s*(am|pm)?",
+            ]
+            
+            for pattern in date_patterns:
+                match = re.search(pattern, query_lower)
+                if match:
+                    date_match = match
+                    break
+            
+            for pattern in time_patterns:
+                match = re.search(pattern, query_lower)
+                if match:
+                    time_match = match
+                    break
+            
+            # Process date
+            if date_match:
+                if "tomorrow" in date_match.group(0):
+                    event_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+                elif "today" in date_match.group(0):
+                    event_date = datetime.now().strftime("%Y-%m-%d")
+                else:
+                    # Default to tomorrow
+                    event_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+            else:
+                event_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+            
+            # Process time
+            if time_match:
+                hour = int(time_match.group(1))
+                minute = int(time_match.group(2)) if time_match.group(2) else 0
+                am_pm = time_match.group(3) if len(time_match.groups()) > 2 else None
+                
+                if am_pm == "pm" and hour != 12:
+                    hour += 12
+                elif am_pm == "am" and hour == 12:
+                    hour = 0
+                
+                event_time = f"{hour:02d}:{minute:02d}"
+            else:
+                event_time = "10:00"  # Default time
+            
+            # Clean event title
+            event_title = re.sub(r"(tomorrow|today|on \w+|next \w+|at \d+:?\d*\s*(am|pm)?)", "", event_title).strip()
+            if not event_title:
+                event_title = "New Event"
+            
+            # Create event
+            result = self.calendar_service.create_event(event_title, event_date, event_time)
+            return result
+            
+        except Exception as e:
+            return f"❌ Error creating event: {str(e)}"
+    
+    def show_calendar(self, query: str) -> str:
+        """Show calendar information."""
+        try:
+            if not self.calendar_service:
+                return "❌ Calendar service not available"
+            
+            query_lower = query.lower()
+            
+            if "today" in query_lower:
+                events = self.calendar_service.list_events(date_filter="today")
+                reminders = self.calendar_service.list_reminders(status="active")
+                return f"📅 **Today's Schedule:**\n\n{events}\n\n⏰ **Active Reminders:**\n{reminders}"
+            elif "tomorrow" in query_lower:
+                events = self.calendar_service.list_events(date_filter="tomorrow")
+                return f"📅 **Tomorrow's Schedule:**\n\n{events}"
+            elif "week" in query_lower:
+                events = self.calendar_service.get_schedule_summary(days=7)
+                reminders = self.calendar_service.list_reminders(status="active")
+                return f"📅 **This Week's Schedule:**\n\n{events}\n\n⏰ **Active Reminders:**\n{reminders}"
+            elif "event" in query_lower:
+                events = self.calendar_service.list_events(days_ahead=30)
+                return f"📅 **Your Events:**\n\n{events}"
+            else:
+                events = self.calendar_service.list_events(days_ahead=10)
+                reminders = self.calendar_service.list_reminders(status="active")
+                return f"📅 **Upcoming Events:**\n\n{events}\n\n⏰ **Active Reminders:**\n{reminders}"
+                
+        except Exception as e:
+            return f"❌ Error showing calendar: {str(e)}"
+    
+    def update_event(self, query: str) -> str:
+        """Update an existing event."""
+        try:
+            if not self.calendar_service:
+                return "❌ Calendar service not available"
+            
+            # This is a simplified implementation
+            # In a full system, you'd parse the query to identify which event to update and how
+            return "🔄 Event update functionality is available. Please specify which event you'd like to update and the changes you want to make."
+            
+        except Exception as e:
+            return f"❌ Error updating event: {str(e)}"
 
 if __name__ == "__main__":
     # Test the advanced automation
