@@ -629,6 +629,16 @@ class ChatArea(QWidget):
         self.scroll_area.verticalScrollBar().setValue(
             self.scroll_area.verticalScrollBar().maximum()
         )
+    
+    def remove_last_message(self):
+        """Remove the last message from the chat."""
+        if self.messages_layout.count() > 1:  # More than just the spacer
+            # Remove the last widget (before the spacer)
+            item = self.messages_layout.itemAt(self.messages_layout.count() - 2)
+            if item and item.widget():
+                widget = item.widget()
+                self.messages_layout.removeWidget(widget)
+                widget.deleteLater()
 
 class InputArea(QWidget):
     """Modern input area with quick actions and voice controls."""
@@ -863,15 +873,21 @@ class ModernJarvisGUI(QMainWindow):
         """)
     
     def initialize_jarvis(self):
-        """Initialize JARVIS chatbot."""
+        """Initialize JARVIS chatbot in background thread."""
         if JARVIS_AVAILABLE:
-            try:
-                self.chatbot = JarvisChatbot()
-                print("✅ JARVIS initialized successfully")
-            except Exception as e:
-                print(f"❌ Failed to initialize JARVIS: {e}")
-                self.show_error("JARVIS Initialization Error", 
-                               f"Failed to initialize JARVIS: {str(e)}")
+            # Initialize JARVIS in background to avoid blocking GUI
+            def init_jarvis():
+                try:
+                    self.chatbot = JarvisChatbot()
+                    print("✅ JARVIS initialized successfully")
+                except Exception as e:
+                    print(f"❌ Failed to initialize JARVIS: {e}")
+                    self.show_error("JARVIS Initialization Error", 
+                                   f"Failed to initialize JARVIS: {str(e)}")
+            
+        # Run initialization in background thread
+        init_thread = threading.Thread(target=init_jarvis, daemon=True)
+        init_thread.start()
         else:
             self.show_error("Missing Dependencies", 
                            "JARVIS backend components are not available.")
@@ -879,19 +895,29 @@ class ModernJarvisGUI(QMainWindow):
     def handle_user_message(self, message: str):
         """Handle user message and get JARVIS response."""
         if not self.chatbot:
-            self.chat_area.add_message("JARVIS is not available. Please check the backend.", is_user=False)
+            self.chat_area.add_message("JARVIS is initializing... Please wait a moment.", is_user=False)
             return
         
         # Add user message to chat
         self.chat_area.add_message(message, is_user=True)
         
-        # Get JARVIS response
-        try:
-            response = self.chatbot.respond(message)
-            self.chat_area.add_message(response, is_user=False)
-        except Exception as e:
-            error_msg = f"Error: {str(e)}"
-            self.chat_area.add_message(error_msg, is_user=False)
+        # Add typing indicator
+        self.chat_area.add_message("JARVIS is thinking...", is_user=False)
+        
+        # Get JARVIS response in background thread
+        def get_response():
+            try:
+                response = self.chatbot.respond(message)
+                # Remove typing indicator and add real response
+                self.chat_area.remove_last_message()
+                self.chat_area.add_message(response, is_user=False)
+            except Exception as e:
+                error_msg = f"Error: {str(e)}"
+                self.chat_area.remove_last_message()
+                self.chat_area.add_message(error_msg, is_user=False)
+        
+        response_thread = threading.Thread(target=get_response, daemon=True)
+        response_thread.start()
     
     def show_error(self, title: str, message: str):
         """Show error dialog."""

@@ -114,9 +114,9 @@ def run_gui_mode():
 def run_modern_gui_mode():
     """Run JARVIS with modern GUI interface."""
     try:
-        from ModernGUI import main as modern_gui_main
-        print("🚀 Starting Modern JARVIS GUI...")
-        modern_gui_main()
+        from WorkingModernGUI import main as working_gui_main
+        print("🚀 Starting Working Modern JARVIS GUI...")
+        working_gui_main()
     except ImportError as e:
         print(f"❌ Modern GUI Import Error: {e}")
         print("Please ensure PyQt5 is installed: pip install PyQt5")
