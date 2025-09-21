@@ -95,14 +95,33 @@ def run_console_mode():
 def run_gui_mode():
     """Run JARVIS with GUI interface."""
     try:
-        from GUI import start_gui
-        print("🚀 Starting JARVIS GUI...")
-        start_gui()
+        # Try modern GUI first
+        try:
+            from ModernGUI import main as modern_gui_main
+            print("🚀 Starting Modern JARVIS GUI...")
+            modern_gui_main()
+        except ImportError:
+            # Fallback to original GUI
+            from GUI import start_gui
+            print("🚀 Starting JARVIS GUI...")
+            start_gui()
     except ImportError as e:
         print(f"❌ GUI Import Error: {e}")
         print("Please ensure PyQt5 is installed: pip install PyQt5")
     except Exception as e:
         print(f"❌ GUI Error: {e}")
+
+def run_modern_gui_mode():
+    """Run JARVIS with modern GUI interface."""
+    try:
+        from ModernGUI import main as modern_gui_main
+        print("🚀 Starting Modern JARVIS GUI...")
+        modern_gui_main()
+    except ImportError as e:
+        print(f"❌ Modern GUI Import Error: {e}")
+        print("Please ensure PyQt5 is installed: pip install PyQt5")
+    except Exception as e:
+        print(f"❌ Modern GUI Error: {e}")
 
 def run_voice_mode():
     """Run JARVIS in voice-only mode."""
@@ -247,7 +266,7 @@ def main():
     """Main entry point for JARVIS."""
     parser = argparse.ArgumentParser(description="JARVIS AI Assistant", add_help=False)
     parser.add_argument('mode', nargs='?', default='console', 
-                       choices=['console', 'gui', 'voice', 'test', 'help'],
+                       choices=['console', 'gui', 'modern', 'voice', 'test', 'help'],
                        help='Run mode for JARVIS')
     
     args = parser.parse_args()
@@ -277,6 +296,8 @@ def main():
         run_console_mode()
     elif args.mode == 'gui':
         run_gui_mode()
+    elif args.mode == 'modern':
+        run_modern_gui_mode()
     elif args.mode == 'voice':
         run_voice_mode()
     elif args.mode == 'test':
