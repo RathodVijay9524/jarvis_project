@@ -21,6 +21,9 @@ googlesearch-python>=1.2.3
 selenium>=4.15.0
 webdriver-manager>=4.0.0
 
+# Enhanced speech recognition (Multi-language support)
+chromedriver-autoinstaller>=0.6.0
+
 # GUI
 PyQt5>=5.15.0
 

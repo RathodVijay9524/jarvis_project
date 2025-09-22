@@ -56,6 +56,24 @@ class JarvisChatbot:
             self.ai_personality = None
             print("⚠️ AI Personality system not available")
         
+        # Initialize Hindi command processor
+        try:
+            from .HindiCommandProcessor import JarvisHindiProcessor
+            self.hindi_processor = JarvisHindiProcessor()
+            print("✅ Hindi command processor initialized")
+        except ImportError:
+            self.hindi_processor = None
+            print("⚠️ Hindi command processor not available")
+        
+        # Initialize Hindi response generator
+        try:
+            from .HindiResponseGenerator import JarvisHindiResponseGenerator
+            self.hindi_response_generator = JarvisHindiResponseGenerator()
+            print("✅ Hindi response generator initialized")
+        except ImportError:
+            self.hindi_response_generator = None
+            print("⚠️ Hindi response generator not available")
+        
         # Command patterns
         self.command_patterns = {
             'search': r'(?:search|find|look up|google)\s+(.+)',
@@ -81,6 +99,16 @@ class JarvisChatbot:
             # Track request for performance metrics
             if self.optimizer:
                 self.optimizer.metrics['total_requests'] += 1
+            
+            # Process Hindi commands first
+            original_prompt = prompt
+            is_hindi_command = False
+            
+            if self.hindi_processor:
+                processed_prompt, is_hindi_command = self.hindi_processor.process_hindi_command(prompt)
+                if is_hindi_command:
+                    prompt = processed_prompt
+                    print(f"🇮🇳 Hindi command processed: '{original_prompt}' → '{prompt}'")
             
             # Analyze user input with AI Personality system
             user_name = self.memory.get_name()
@@ -111,6 +139,27 @@ class JarvisChatbot:
             # Enhance response with AI Personality
             if self.ai_personality and analysis:
                 response = self.ai_personality.generate_contextual_response(response, analysis)
+            
+            # Generate Hindi response if user spoke in Hindi
+            if self.hindi_response_generator and is_hindi_command:
+                # Determine command type for appropriate Hindi response
+                command_type = "general"
+                if "email" in original_prompt.lower() or "mail" in original_prompt.lower() or "dikhao" in original_prompt.lower():
+                    command_type = "email"
+                elif "mausam" in original_prompt.lower() or "weather" in original_prompt.lower():
+                    command_type = "weather"
+                elif "calendar" in original_prompt.lower() or "schedule" in original_prompt.lower():
+                    command_type = "calendar"
+                elif "madad" in original_prompt.lower() or "help" in original_prompt.lower():
+                    command_type = "help"
+                elif "namaste" in original_prompt.lower() or "hello" in original_prompt.lower():
+                    command_type = "greeting"
+                elif "dhanyawad" in original_prompt.lower() or "shukriya" in original_prompt.lower():
+                    command_type = "thanks"
+                
+                hindi_response = self.hindi_response_generator.translate_response_to_hindi(response, command_type)
+                print(f"🇮🇳 Generated Hindi response for: {original_prompt}")
+                response = hindi_response
             
             # Performance monitoring
             response_time = time.time() - start_time

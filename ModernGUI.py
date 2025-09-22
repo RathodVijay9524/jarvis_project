@@ -964,16 +964,56 @@ class ModernJarvisGUI(QMainWindow):
             print(f"TTS Error: {e}")
     
     def start_voice_input(self):
-        """Start voice input for user."""
+        """Start enhanced voice input with multi-language support."""
         try:
-            from Backend.SpeechToText import JarvisSpeechToText
-            stt = JarvisSpeechToText()
-            
             def listen_for_voice():
                 try:
+                    # Try enhanced speech recognition first (supports Hindi and other languages)
+                    try:
+                        from Backend.SimplifiedEnhancedSpeech import JarvisSimplifiedSpeech
+                        
+                        print("🎤 Using enhanced multilingual recognition...")
+                        print("🌐 Supports: English, Hindi, and 18+ languages")
+                        
+                        enhanced_stt = JarvisSimplifiedSpeech()
+                        
+                        # Try multilingual recognition
+                        results = enhanced_stt.listen_multilingual(["english", "hindi"], timeout=5)
+                        
+                        # Find the best result
+                        best_result = ""
+                        detected_language = "english"
+                        
+                        for lang, result in results.items():
+                            if result and len(result.strip()) > 2 and not result.startswith("❌") and "No speech detected" not in result:
+                                best_result = result
+                                detected_language = lang
+                                print(f"✅ Recognized in {lang}: {result}")
+                                break
+                        
+                        enhanced_stt.cleanup()
+                        
+                        if best_result:
+                            # Add language indicator to the message
+                            lang_flag = "🇮🇳" if detected_language == "hindi" else "🇺🇸"
+                            display_text = f"{lang_flag} {best_result}"
+                            self.handle_user_message(display_text.strip(), use_voice=True)
+                            return
+                            
+                    except Exception as e:
+                        print(f"Enhanced recognition failed: {e}, falling back to standard...")
+                    
+                    # Fallback to standard speech recognition
+                    from Backend.SpeechToText import JarvisSpeechToText
+                    stt = JarvisSpeechToText()
+                    
+                    print("🎤 Using standard speech recognition...")
                     text = stt.listen_once()
                     if text and text.strip():
                         self.handle_user_message(text.strip(), use_voice=True)
+                    else:
+                        self.response_ready.emit("🎤 No speech detected. Please try again.", False)
+                        
                 except Exception as e:
                     self.response_ready.emit(f"Voice input error: {str(e)}", False)
             
@@ -990,6 +1030,15 @@ class ModernJarvisGUI(QMainWindow):
     def add_initialization_message(self, message: str):
         """Add an initialization status message (signal handler)."""
         self.chat_area.add_message(message, is_user=False)
+    
+    def closeEvent(self, event):
+        """Handle application close event."""
+        try:
+            print("🧹 JARVIS GUI closing...")
+        except Exception as e:
+            print(f"⚠️ Cleanup error: {e}")
+        
+        event.accept()
     
     def remove_last_message(self):
         """Remove the last message from the chat area (signal handler)."""
